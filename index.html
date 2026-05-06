@@ -184,9 +184,9 @@
 //  ⚙️  CONFIGURATION — 请填入你的密钥
 // ============================================================
 // GAS Web App URL（部署后从 Google Apps Script 复制）
-const GAS_URL    = "FILL_IN_GAS_URL";
-const GEMINI_KEY = "FILL_IN_GEMINI_API_KEY";
-const OPENAI_KEY = "FILL_IN_OPENAI_API_KEY";
+// 填入你的 GAS Web App URL（部署后从 Google Apps Script 复制）
+const GAS_URL = "FILL_IN_GAS_URL";
+// ⚠️ Gemini 和 OpenAI 密钥已移至 GAS Script Properties，前端无需填写
 // ============================================================
 
 // ── GAS 请求封装 ──────────────────────────────────────────────
@@ -640,26 +640,8 @@ async function evaluate(type, id, scoreKey, b64, target, mime) {
     evalEl.classList.remove('hidden');
     evalEl.innerHTML = '<span class="text-xs text-gray-400 animate-pulse">小老师打分中…</span>';
 
-    const prompt = `你是一位温柔耐心的一年级语文老师，正在评估学生朗读「${target}」的表现。
-评分标准：发音准确度（50%）、流畅度（30%）、声音清晰度（20%）。
-如果录音中听不到任何声音或内容完全错误，给1星。
-请用温暖鼓励的语气给出一句15字内的反馈。
-严格返回 JSON：{"stars": 整数(1-5), "feedback": "鼓励语"}`;
-
     try {
-        const result = await fetchGemini('gemini-2.5-flash-preview-05-20', {
-            contents: [{
-                role: 'user',
-                parts: [
-                    { text: prompt },
-                    { inlineData: { mimeType: mime, data: b64 } }
-                ]
-            }],
-            generationConfig: { responseMimeType: 'application/json' }
-        });
-
-        const raw   = result.candidates[0].content.parts[0].text;
-        const data  = JSON.parse(raw);
+        const data  = await gasPost({ action: 'evaluateReading', target, b64, mime });
         const stars = Math.max(1, Math.min(5, Math.round(data.stars)));
 
         evalEl.innerHTML = `
@@ -915,112 +897,33 @@ function renderAnalytics(lesson, attempts) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  GEMINI API
+//  AI 调用（全部走 GAS 代理，密钥在 GAS Script Properties）
 // ══════════════════════════════════════════════════════════════
-async function fetchGemini(model, body, retries = 3) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const res = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
-                { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-            );
-            if (res.ok) return res.json();
-            if (res.status === 429) await new Promise(r => setTimeout(r, (i + 1) * 2000));
-            else throw new Error(`HTTP ${res.status}`);
-        } catch(e) {
-            if (i === retries - 1) throw e;
-        }
-    }
-}
-
 async function processWithGemini(text) {
-    const result = await fetchGemini('gemini-2.5-flash-preview-05-20', {
-        contents: [{
-            parts: [{
-                text: `你是一位经验丰富的小学华文老师，专门教一年级学生。请分析以下课文，完成两件事：
-1. 提取 3-4 个最重要的生字或生词（优先选单个汉字，选学生最可能不认识的）
-2. 将课文按自然段或意群分成 2-4 个段落
-
-课文内容：
-${text}
-
-请严格按以下 JSON 格式返回（不要加 markdown 代码块）：
-{
-  "words": [
-    {
-      "word": "字或词",
-      "pinyin": "pīn yīn（带声调符号）",
-      "explanation": "中文解释，10字以内",
-      "imagePrompt": "English prompt for a simple child cartoon illustration",
-      "bushou": "部首（单个汉字）",
-      "bushouMeaning": "部首含义，10字以内，如'三点水，表示水'",
-      "peici": ["配词1", "配词2", "配词3"],
-      "koujue": "记字口诀，20字以内，要押韵或联想，生动有趣，帮助一年级学生记住这个字的写法或意思",
-      "duoyinzi": null
-    }
-  ],
-  "paragraphs": ["第一段", "第二段"]
+    const data = await gasPost({ action: 'processLesson', text });
+    return data; // { words, paragraphs }
 }
 
-重要说明：
-- bushou：填部首本身的汉字，例如"氵""木""口"
-- bushouMeaning：简短说明部首代表的意思
-- peici：包含该字的常用词语，例如"水"→["水果","雨水","水桶"]
-- koujue：联想或顺口溜，例如"水"→"三点水弯弯流，河里小鱼乐悠悠"
-- duoyinzi：若该字有多个读音，填入数组，例如：
-  [{"pinyin":"háng","meaning":"行业、排列","example":"银行"},{"pinyin":"xíng","meaning":"行走、可以","example":"行走"}]
-  若只有一个读音，填 null`
-            }]
-        }],
-        generationConfig: { responseMimeType: 'application/json' }
-    });
-    return JSON.parse(result.candidates[0].content.parts[0].text);
-}
-
-// ── 图片生成 (hid = hex DOM id) ──────────────────────────────
+// ── 图片生成 ─────────────────────────────────────────────────
 async function generateImage(hid, prompt) {
     const el = document.getElementById(`img-${hid}`);
     if (!el) return;
     try {
-        const res = await fetch('https://api.openai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_KEY}`
-            },
-            body: JSON.stringify({
-                model:           'dall-e-3',
-                prompt:          `Simple cute cartoon illustration for Chinese primary school students. Colorful, white background, friendly and clear. Subject: ${prompt}`,
-                n:               1,
-                size:            '1024x1024',
-                response_format: 'b64_json'
-            })
-        });
-        if (res.ok) {
-            const data = await res.json();
-            const b64  = data.data?.[0]?.b64_json;
-            if (b64) {
-                el.innerHTML = `<img src="data:image/png;base64,${b64}" class="w-full h-full object-cover">`;
-                return;
-            }
+        const data = await gasPost({ action: 'generateImage', prompt });
+        if (data.b64) {
+            el.innerHTML = `<img src="data:image/png;base64,${data.b64}" class="w-full h-full object-cover">`;
+            return;
         }
-    } catch(e) { /* fallback below */ }
+    } catch(e) { /* fallback */ }
     el.textContent = '🖼️';
 }
 
-// ── TTS ───────────────────────────────────────────────────────
+// ── TTS ──────────────────────────────────────────────────────
 window.speakText = async function(text) {
     if (!text) return;
     try {
-        const result = await fetchGemini('gemini-2.5-flash-preview-tts:generateContent', {
-            contents: [{ parts: [{ text }] }],
-            generationConfig: {
-                responseModalities: ['AUDIO'],
-                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } } }
-            }
-        });
-        const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (audioData) playPCM(audioData, 24000);
+        const data = await gasPost({ action: 'tts', text });
+        if (data.audioData) playPCM(data.audioData, 24000);
     } catch(e) { showMsg('语音播放失败'); }
 };
 
