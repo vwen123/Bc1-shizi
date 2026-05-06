@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小状元识字朗读</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #f0f9ff, #e0f2fe); min-height: 100vh; }
+        .hanzi-big { font-family: 'Ma Shan Zheng', cursive; font-size: 3rem; line-height: 1.2; }
+        .pinyin { color: #ef4444; font-weight: bold; font-size: 0.8rem; }
+        .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
+        .pulse-ring { animation: pulseRing 1.5s infinite; }
+        @keyframes pulseRing {
+            0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
+            70%  { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+            100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+        }
+        .slide-in { animation: slideIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
+        @keyframes slideIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+        .star-filled { color: #fbbf24; }
+        .star-empty  { color: #d1d5db; }
+        .line-clamp-2 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+
+        /* ── 生字卡片 ── */
+        .section-chip { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+        .hw-box { border: 2px dashed #e5e7eb; border-radius: 1rem; background: #fafafa; padding: 0.5rem; display: flex; flex-direction: column; align-items: center; }
+        .hw-writers { display: flex; gap: 4px; justify-content: center; align-items: center; }
+        /* Stroke order grid bg lines */
+        .hw-box svg { border-radius: 0.5rem; }
+        .tab-btn { flex: 1; padding: 0.4rem; border-radius: 0.75rem; font-size: 0.7rem; font-weight: 700; transition: all 0.15s; }
+        .tab-btn.active { background: #3b82f6; color: white; }
+        .tab-btn:not(.active) { background: #eff6ff; color: #3b82f6; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+<!-- ══════════════════════════════════════
+     VIEW 1: 老师控制台
+══════════════════════════════════════ -->
+<div id="teacherView" class="hidden max-w-4xl mx-auto">
+    <header class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-blue-600 tracking-widest">🌟 小状元识字朗读</h1>
+        <p class="text-gray-500 mt-1">老师控制台</p>
+    </header>
+
+    <!-- Create lesson -->
+    <div class="bg-white rounded-3xl shadow-lg p-6 mb-8 border-2 border-blue-100">
+        <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <i class="fas fa-plus-circle text-blue-500"></i> 创建新课程
+        </h2>
+        <textarea id="lessonInput" rows="4" placeholder="在此粘贴课文内容..."
+            class="w-full p-4 border-2 border-blue-100 rounded-2xl focus:outline-none focus:border-blue-400 text-base mb-4 resize-none"></textarea>
+        <div class="flex justify-end">
+            <button onclick="window.createLesson()"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition-all active:scale-95">
+                <i class="fas fa-magic"></i> 生成课程
+            </button>
+        </div>
+    </div>
+
+    <!-- Lesson list -->
+    <h2 class="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
+        <i class="fas fa-book-open text-indigo-500"></i> 已有课程
+    </h2>
+    <div id="teacherLessonList" class="space-y-3">
+        <p class="text-gray-400 text-center py-10">正在加载...</p>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     VIEW 2: 学生输入姓名
+══════════════════════════════════════ -->
+<div id="studentNameView" class="hidden max-w-md mx-auto">
+    <div class="bg-white rounded-3xl shadow-xl p-8 text-center slide-in mt-20">
+        <div class="text-6xl mb-4">🎓</div>
+        <h1 class="text-2xl font-bold text-blue-600 mb-2">小状元识字朗读</h1>
+        <p id="lessonPreview" class="text-gray-500 text-sm mb-6"></p>
+        <input id="studentNameInput" type="text" placeholder="输入你的名字" maxlength="10"
+            class="w-full p-4 border-2 border-blue-200 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-500 mb-4">
+        <button onclick="window.startPractice()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold text-lg transition-all active:scale-95">
+            开始挑战 <i class="fas fa-arrow-right ml-2"></i>
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     VIEW 3: 学生练习界面
+══════════════════════════════════════ -->
+<div id="practiceView" class="hidden max-w-5xl mx-auto">
+
+    <!-- Top bar -->
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-blue-600">🌟 小状元识字</h1>
+        <div id="studentBadge" class="bg-white rounded-full px-4 py-2 shadow text-sm font-bold text-gray-700"></div>
+    </div>
+
+    <!-- Final score banner -->
+    <div id="finalBanner" class="hidden slide-in bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-6 mb-6 text-white shadow-xl">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="bg-white text-orange-500 w-14 h-14 rounded-full flex items-center justify-center text-3xl">🏆</div>
+                <div>
+                    <div class="font-bold text-2xl">恭喜完成！</div>
+                    <div class="opacity-80">你是最棒的小状元！</div>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-xs uppercase tracking-widest opacity-70 mb-1">最终得分</div>
+                <div class="text-5xl font-bold" id="finalScore">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stage 1 -->
+    <div id="stage1" class="mb-10">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span class="bg-blue-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">1</span>
+            第一关：生词对对碰
+        </h2>
+        <div id="cardGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+    </div>
+
+    <!-- Stage 2 (unlocked after stage 1) -->
+    <div id="stage2" class="mb-10 hidden slide-in">
+        <div class="h-0.5 bg-gray-200 my-8 rounded-full"></div>
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <span class="bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
+            第二关：全文朗读挑战
+        </h2>
+        <div id="paragraphContainer" class="space-y-4"></div>
+    </div>
+
+    <!-- Finish button -->
+    <div id="finishBtn" class="hidden flex justify-center py-10">
+        <button onclick="window.finishLesson()"
+            class="bg-green-500 hover:bg-green-600 text-white px-12 py-5 rounded-full text-2xl font-bold shadow-2xl flex items-center gap-4 transition-all hover:scale-105 active:scale-95">
+            <i class="fas fa-trophy"></i> 完成朗读，查看总分！
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     VIEW 4: 数据分析
+══════════════════════════════════════ -->
+<div id="analyticsView" class="hidden max-w-5xl mx-auto">
+    <header class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-blue-600">📊 学生朗读数据分析</h1>
+        <p class="text-gray-500 mt-1" id="analyticsTitle"></p>
+    </header>
+    <div id="analyticsContent">
+        <p class="text-center text-gray-400 py-20">正在加载数据...</p>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     GLOBAL: Message + Loader
+══════════════════════════════════════ -->
+<div id="messageBox" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 transition-all">
+    <span id="messageContent"></span>
+</div>
+
+<div id="globalLoader" class="hidden fixed inset-0 bg-blue-900/40 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="bg-white p-8 rounded-3xl shadow-2xl text-center">
+        <div class="relative w-14 h-14 mx-auto mb-4">
+            <div class="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+            <div class="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+        </div>
+        <div class="font-bold text-gray-800" id="loaderText">小老师准备中...</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     FIREBASE + APP SCRIPT
+══════════════════════════════════════ -->
+<script type="module">
+import { initializeApp }          from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, updateDoc,
+         getDocs, serverTimestamp, query, orderBy }
+                                  from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+
+// ============================================================
+//  ⚙️  CONFIGURATION — 请填入你的密钥
+// ============================================================
+const FIREBASE_CONFIG = {
+    apiKey:            "FILL_IN_FIREBASE_API_KEY",
+    authDomain:        "FILL_IN.firebaseapp.com",
+    projectId:         "FILL_IN_PROJECT_ID",
+    storageBucket:     "FILL_IN.appspot.com",
+    messagingSenderId: "FILL_IN",
+    appId:             "FILL_IN"
+};
+
+// ⚠️ Gemini key: 在 Google Cloud Console 限制此 key 只允许你的网域（HTTP referrers）
+const GEMINI_KEY = "FILL_IN_GEMINI_API_KEY";
+// ⚠️ OpenAI key: 在 platform.openai.com 限制此 key 只允许你的网域
+const OPENAI_KEY = "FILL_IN_OPENAI_API_KEY";
+// ============================================================
+
+const app = initializeApp(FIREBASE_CONFIG);
+const db  = getFirestore(app);
+
+// ── 路由状态 ──────────────────────────────────────────────────
+const params   = new URLSearchParams(location.search);
+const lessonId = params.get('lesson');
+const viewMode = params.get('view'); // 'analytics' | null
+
+// ── 练习状态 ──────────────────────────────────────────────────
+let currentLesson   = null;
+let currentAttemptId = null;
+let studentName     = '';
+let paraTextMap     = {};    // paraId -> paragraph text
+let scores          = { words: {}, paragraphs: {} };
+let mediaRecorder, audioChunks = [], isRecording = false;
+
+// ══════════════════════════════════════════════════════════════
+//  ROUTING
+// ══════════════════════════════════════════════════════════════
+async function init() {
+    if (!lessonId) {
+        show('teacherView');
+        await loadTeacherLessons();
+    } else if (viewMode === 'analytics') {
+        show('analyticsView');
+        await loadAnalytics(lessonId);
+    } else {
+        // Student flow
+        setLoading(true, '课程加载中...');
+        currentLesson = await loadLesson(lessonId);
+        setLoading(false);
+        if (!currentLesson) {
+            showMsg('❌ 课程不存在，请确认链接');
+            return;
+        }
+        const preview = currentLesson.inputText?.slice(0, 30) + '...';
+        document.getElementById('lessonPreview').textContent = `课文：${preview}`;
+        show('studentNameView');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TEACHER — 创建课程
+// ══════════════════════════════════════════════════════════════
+window.createLesson = async function() {
+    const text = document.getElementById('lessonInput').value.trim();
+    if (!text) { showMsg('请先输入课文内容'); return; }
+
+    setLoading(true, '小老师分析课文中...');
+    try {
+        const data = await processWithGemini(text);
+
+        const ref = doc(collection(db, 'lessons'));
+        await setDoc(ref, {
+            inputText:  text,
+            words:      data.words,
+            paragraphs: data.paragraphs,
+            createdAt:  serverTimestamp()
+        });
+
+        document.getElementById('lessonInput').value = '';
+        showMsg('✅ 课程创建成功！');
+        await loadTeacherLessons();
+    } catch(e) {
+        console.error(e);
+        showMsg('创建失败，请检查 API 密钥');
+    } finally {
+        setLoading(false);
+    }
+};
+
+// ── 老师课程列表 ──────────────────────────────────────────────
+async function loadTeacherLessons() {
+    const container = document.getElementById('teacherLessonList');
+    try {
+        const snap = await getDocs(query(collection(db, 'lessons'), orderBy('createdAt', 'desc')));
+
+        if (snap.empty) {
+            container.innerHTML = '<p class="text-gray-400 text-center py-10">还没有课程，创建第一个吧 ↑</p>';
+            return;
+        }
+
+        const items = await Promise.all(snap.docs.map(async d => {
+            const data = d.data();
+            const attSnap = await getDocs(collection(db, 'lessons', d.id, 'attempts'));
+            const completedCount = attSnap.docs.filter(a => a.data().completedAt).length;
+            const shareUrl     = `${location.origin}${location.pathname}?lesson=${d.id}`;
+            const analyticsUrl = `${location.origin}${location.pathname}?lesson=${d.id}&view=analytics`;
+            const date = data.createdAt?.toDate().toLocaleDateString('zh-CN') || '—';
+
+            return `
+            <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm card-hover">
+                <div class="flex justify-between items-start mb-2">
+                    <p class="font-bold text-gray-800 line-clamp-2 flex-1 mr-4">${data.inputText?.slice(0, 60)}...</p>
+                    <span class="text-xs text-gray-400 whitespace-nowrap">${date}</span>
+                </div>
+                <div class="flex gap-3 text-xs text-gray-500 mb-4">
+                    <span>📝 生词：${data.words?.map(w => w.word).join('、') || '—'}</span>
+                    <span>|</span>
+                    <span>📖 ${data.paragraphs?.length || 0} 段</span>
+                    <span>|</span>
+                    <span>👤 ${attSnap.size} 人参与，${completedCount} 人完成</span>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="navigator.clipboard.writeText('${shareUrl}').then(()=>window.showMsg('✅ 学生链接已复制！'))"
+                        class="text-xs bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-bold flex items-center gap-1 hover:bg-blue-200 transition-all">
+                        <i class="fas fa-link"></i> 复制学生链接
+                    </button>
+                    <a href="${analyticsUrl}" target="_blank"
+                        class="text-xs bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-bold flex items-center gap-1 hover:bg-emerald-200 transition-all">
+                        <i class="fas fa-chart-bar"></i> 查看数据分析
+                    </a>
+                </div>
+            </div>`;
+        }));
+
+        container.innerHTML = items.join('');
+    } catch(e) {
+        console.error(e);
+        container.innerHTML = '<p class="text-red-400 text-center py-8">加载失败，请检查 Firebase 配置</p>';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  STUDENT — 开始练习
+// ══════════════════════════════════════════════════════════════
+window.startPractice = function() {
+    const name = document.getElementById('studentNameInput').value.trim();
+    if (!name) { showMsg('请输入你的名字！'); return; }
+    studentName = name;
+    scores = { words: {}, paragraphs: {} };
+    currentAttemptId = null;
+
+    show('practiceView');
+    document.getElementById('studentBadge').textContent = `${studentName} 同学，加油！`;
+    renderLesson(currentLesson);
+};
+
+// ── 加载课程 ──────────────────────────────────────────────────
+async function loadLesson(id) {
+    try {
+        const snap = await getDoc(doc(db, 'lessons', id));
+        return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    } catch(e) { return null; }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════════════════════
+function renderLesson(lesson) {
+    document.getElementById('finalBanner').classList.add('hidden');
+    document.getElementById('stage2').classList.add('hidden');
+    document.getElementById('finishBtn').classList.add('hidden');
+    renderWords(lesson.words);
+    renderParagraphs(lesson.paragraphs);
+}
+
+// ── 每个字的 HanziWriter 实例 ─────────────────────────────────
+const writerInstances = {}; // hid -> [writer, ...]
+
+function charHid(word) {
+    // stable hex ID safe for DOM & JS keys
+    return [...word].map(c => c.codePointAt(0).toString(16)).join('-');
+}
+
+function renderWords(words) {
+    const grid = document.getElementById('cardGrid');
+    grid.innerHTML = '';
+    words.forEach(item => {
+        const hid   = charHid(item.word);
+        const chars = [...item.word];
+        const hwSize = chars.length === 1 ? 130 : chars.length === 2 ? 100 : 80;
+
+        // 多音字 HTML
+        let duoyinHtml = '';
+        if (Array.isArray(item.duoyinzi) && item.duoyinzi.length > 1) {
+            duoyinHtml = `
+            <div class="bg-orange-50 rounded-2xl p-3">
+                <div class="section-chip text-orange-500 mb-2">🔤 多音多义</div>
+                <div class="space-y-1.5">
+                    ${item.duoyinzi.map(d => `
+                        <div class="flex flex-wrap items-baseline gap-2">
+                            <span class="pinyin text-sm">${d.pinyin}</span>
+                            <span class="text-gray-500 text-xs flex-1">${d.meaning}</span>
+                            <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-bold">${d.example}</span>
+                        </div>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        // HanziWriter divs (one per character)
+        const hwDivs = chars.map((_, i) =>
+            `<div id="hw-${hid}-${i}" style="width:${hwSize}px;height:${hwSize}px"></div>`
+        ).join('');
+
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-3xl overflow-hidden shadow-md card-hover border border-gray-100 flex flex-col';
+        card.innerHTML = `
+            <!-- 图片 -->
+            <div id="img-${hid}" class="h-36 bg-gradient-to-br from-sky-50 to-violet-50 flex items-center justify-center text-5xl shrink-0">⏳</div>
+
+            <div class="p-4 flex flex-col gap-3">
+                <!-- 拼音 + 汉字 + 解释 -->
+                <div class="text-center">
+                    <div class="pinyin text-sm">${item.pinyin}</div>
+                    <div class="hanzi-big text-gray-800">${item.word}</div>
+                    <div class="text-gray-400 text-xs mt-0.5">${item.explanation}</div>
+                </div>
+
+                <!-- 部首 + 配词 -->
+                <div class="bg-violet-50 rounded-2xl p-3">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="section-chip text-violet-500">🏠 部首</span>
+                        <span class="bg-violet-100 text-violet-700 px-3 py-0.5 rounded-full text-sm font-bold">${item.bushou ?? '—'}</span>
+                        <span class="text-violet-400 text-xs">${item.bushouMeaning ?? ''}</span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        ${(item.peici ?? []).map(p =>
+                            `<span class="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold">${p}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+
+                <!-- 记字口诀 -->
+                <div class="bg-amber-50 rounded-2xl p-3">
+                    <div class="section-chip text-amber-500 mb-1">💡 记字口诀</div>
+                    <div class="text-amber-800 text-sm font-medium leading-relaxed">${item.koujue ?? '—'}</div>
+                </div>
+
+                <!-- 多音多义 (conditional) -->
+                ${duoyinHtml}
+
+                <!-- 笔顺 + 描红 -->
+                <div class="hw-box">
+                    <div class="section-chip text-gray-500 mb-2">✏️ 笔顺 · 描红</div>
+                    <!-- 模式切换 -->
+                    <div class="flex gap-2 w-full mb-3">
+                        <button id="btn-stroke-${hid}" onclick="window.playStroke('${hid}')"
+                            class="tab-btn active">▶ 看笔顺</button>
+                        <button id="btn-trace-${hid}" onclick="window.startTrace('${hid}')"
+                            class="tab-btn">✏️ 描红练习</button>
+                    </div>
+                    <!-- HanziWriter canvas 区域 -->
+                    <div class="hw-writers">${hwDivs}</div>
+                    <!-- 描红结果 -->
+                    <div id="trace-result-${hid}" class="mt-2 text-center text-xs hidden"></div>
+                </div>
+
+                <!-- 朗读录音 -->
+                <div id="eval-word-${hid}" class="hidden p-3 bg-yellow-50 rounded-2xl text-sm"></div>
+                <div class="flex justify-center gap-3">
+                    <button data-text="${item.word}" onclick="window.speakText(this.dataset.text)"
+                        title="听读音"
+                        class="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition-all">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <button id="rec-word-${hid}" data-id="${hid}" data-type="word" data-word="${item.word}"
+                        onclick="window.toggleRecord(this)"
+                        class="w-11 h-11 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-all">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>`;
+
+        grid.appendChild(card);
+        generateImage(hid, item.imagePrompt);
+        // 等 DOM 稳定后再初始化 HanziWriter
+        setTimeout(() => initWriters(hid, item.word), 80);
+    });
+}
+
+// ── HanziWriter：初始化 ───────────────────────────────────────
+function initWriters(hid, word) {
+    const chars = [...word];
+    const size  = chars.length === 1 ? 130 : chars.length === 2 ? 100 : 80;
+    writerInstances[hid] = [];
+    chars.forEach((ch, i) => {
+        const el = document.getElementById(`hw-${hid}-${i}`);
+        if (!el) return;
+        try {
+            const w = HanziWriter.create(`hw-${hid}-${i}`, ch, {
+                width: size, height: size, padding: 8,
+                showOutline: true,
+                strokeColor: '#1d4ed8',
+                outlineColor: '#bfdbfe',
+                drawingColor: '#dc2626',
+                drawingWidth: size > 100 ? 10 : 8,
+                strokeAnimationSpeed: 1,
+                delayBetweenStrokes: 350,
+                highlightColor: '#fbbf24'
+            });
+            writerInstances[hid].push(w);
+        } catch(e) {
+            el.innerHTML = `<div class="text-gray-300 text-xs text-center pt-4">${ch}<br>暂缺</div>`;
+        }
+    });
+}
+
+// ── 播放笔顺动画 ──────────────────────────────────────────────
+window.playStroke = function(hid) {
+    setTabActive(hid, 'stroke');
+    document.getElementById(`trace-result-${hid}`)?.classList.add('hidden');
+    const writers = writerInstances[hid];
+    if (!writers?.length) return;
+    // 逐字依序播放
+    let chain = Promise.resolve();
+    writers.forEach(w => {
+        chain = chain.then(() => new Promise(res => w.animateCharacter({ onComplete: res })));
+    });
+};
+
+// ── 开始描红练习 ──────────────────────────────────────────────
+window.startTrace = function(hid) {
+    setTabActive(hid, 'trace');
+    const resultEl = document.getElementById(`trace-result-${hid}`);
+    resultEl.classList.remove('hidden');
+    resultEl.innerHTML = '<span class="text-gray-400 animate-pulse">请按笔顺描红每一笔…</span>';
+
+    const writers = writerInstances[hid];
+    if (!writers?.length) return;
+
+    let totalMistakes = 0;
+    let completed     = 0;
+
+    writers.forEach(w => {
+        w.quiz({
+            leniency: 0.8,
+            showHintAfterMisses: 3,
+            onMistake: () => { totalMistakes++; },
+            onComplete: (summary) => {
+                totalMistakes += (summary.totalMistakes ?? 0);
+                completed++;
+                if (completed === writers.length) {
+                    const stars = totalMistakes === 0 ? 5
+                                : totalMistakes <= 2  ? 4
+                                : totalMistakes <= 5  ? 3
+                                : totalMistakes <= 9  ? 2 : 1;
+                    const msg   = totalMistakes === 0 ? '完美！一笔不差！🎉'
+                                : totalMistakes <= 3  ? '写得很好！继续加油！'
+                                : '完成了！多练几次会更棒！';
+                    resultEl.innerHTML = `
+                        <div class="text-yellow-400 text-xl mb-1">
+                            ${'⭐'.repeat(stars)}${'<span class="text-gray-200">☆</span>'.repeat(5 - stars)}
+                        </div>
+                        <div class="text-green-600 font-bold">${msg}</div>`;
+                }
+            }
+        });
+    });
+};
+
+function setTabActive(hid, mode) {
+    const sb = document.getElementById(`btn-stroke-${hid}`);
+    const tb = document.getElementById(`btn-trace-${hid}`);
+    if (!sb || !tb) return;
+    sb.classList.toggle('active', mode === 'stroke');
+    tb.classList.toggle('active', mode === 'trace');
+}
+
+function renderParagraphs(paragraphs) {
+    const container = document.getElementById('paragraphContainer');
+    container.innerHTML = '';
+    paragraphs.forEach((p, idx) => {
+        const pId = `para-${idx}`;
+        paraTextMap[pId] = p;
+
+        const box = document.createElement('div');
+        box.className = 'bg-white rounded-2xl p-6 border-2 border-blue-50 shadow-sm';
+        box.innerHTML = `
+            <p class="text-xl text-gray-700 leading-relaxed mb-5 select-none">${p}</p>
+            <div class="flex items-center justify-between border-t border-gray-100 pt-4">
+                <div id="eval-${pId}" class="flex flex-col gap-1 text-sm"></div>
+                <div class="flex gap-3">
+                    <button data-id="${pId}" onclick="window.speakParaById(this.dataset.id)"
+                        class="flex items-center gap-2 text-blue-600 bg-blue-50 px-5 py-2 rounded-full text-sm font-bold hover:bg-blue-100 transition-all">
+                        <i class="fas fa-play"></i> 听
+                    </button>
+                    <button id="rec-btn-${pId}" data-id="${pId}" data-type="para"
+                        onclick="window.toggleRecord(this)"
+                        class="flex items-center gap-2 text-red-600 bg-red-50 px-5 py-2 rounded-full text-sm font-bold hover:bg-red-100 transition-all">
+                        <i class="fas fa-microphone"></i> 读
+                    </button>
+                </div>
+            </div>`;
+        container.appendChild(box);
+    });
+}
+
+window.speakParaById = function(id) { window.speakText(paraTextMap[id]); };
+
+// ══════════════════════════════════════════════════════════════
+//  RECORDING
+// ══════════════════════════════════════════════════════════════
+window.toggleRecord = async function(btn) {
+    if (isRecording) {
+        if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+        return;
+    }
+    try {
+        const stream  = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mime    = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+        mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
+        audioChunks   = [];
+        isRecording   = true;
+
+        const origHtml = btn.innerHTML;
+        btn.classList.add('pulse-ring', '!bg-red-500', '!text-white');
+        btn.innerHTML = btn.dataset.type === 'word'
+            ? '<i class="fas fa-stop"></i>'
+            : '<i class="fas fa-stop"></i> 停止';
+
+        showMsg('🔴 录音中…点击停止');
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            isRecording = false;
+            stream.getTracks().forEach(t => t.stop());
+            btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
+            btn.innerHTML = origHtml;
+
+            const blob   = new Blob(audioChunks, { type: mime });
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onloadend = () => {
+                const b64      = reader.result.split(',')[1];
+                const type     = btn.dataset.type;
+                const id       = btn.dataset.id;               // hid (word) | paraId (para)
+                const word     = btn.dataset.word ?? '';       // actual hanzi for words
+                const target   = type === 'word' ? word : paraTextMap[id];
+                const scoreKey = type === 'word' ? word : id; // analytics expects hanzi as key
+                evaluate(type, id, scoreKey, b64, target, mime);
+            };
+        };
+        mediaRecorder.start();
+    } catch(e) {
+        showMsg('❌ 无法使用麦克风，请检查权限');
+    }
+};
+
+// ══════════════════════════════════════════════════════════════
+//  EVALUATE
+// ══════════════════════════════════════════════════════════════
+async function evaluate(type, id, scoreKey, b64, target, mime) {
+    // id       = DOM id (hid for words, paraId for paras)
+    // scoreKey = key stored in scores object (hanzi for words, paraId for paras)
+    const divId  = type === 'word' ? `eval-word-${id}` : `eval-${id}`;
+    const evalEl = document.getElementById(divId);
+    if (!evalEl) return;
+    evalEl.classList.remove('hidden');
+    evalEl.innerHTML = '<span class="text-xs text-gray-400 animate-pulse">小老师打分中…</span>';
+
+    const prompt = `你是一位温柔耐心的一年级语文老师，正在评估学生朗读「${target}」的表现。
+评分标准：发音准确度（50%）、流畅度（30%）、声音清晰度（20%）。
+如果录音中听不到任何声音或内容完全错误，给1星。
+请用温暖鼓励的语气给出一句15字内的反馈。
+严格返回 JSON：{"stars": 整数(1-5), "feedback": "鼓励语"}`;
+
+    try {
+        const result = await fetchGemini('gemini-2.5-flash-preview-05-20', {
+            contents: [{
+                role: 'user',
+                parts: [
+                    { text: prompt },
+                    { inlineData: { mimeType: mime, data: b64 } }
+                ]
+            }],
+            generationConfig: { responseMimeType: 'application/json' }
+        });
+
+        const raw   = result.candidates[0].content.parts[0].text;
+        const data  = JSON.parse(raw);
+        const stars = Math.max(1, Math.min(5, Math.round(data.stars)));
+
+        evalEl.innerHTML = `
+            <div class="text-lg leading-none">
+                ${Array(stars).fill('<span class="star-filled">⭐</span>').join('')}${Array(5-stars).fill('<span class="star-empty">☆</span>').join('')}
+            </div>
+            <div class="text-blue-600 font-bold text-xs mt-1">${data.feedback}</div>`;
+
+        if (type === 'word') scores.words[scoreKey] = stars;
+        else                  scores.paragraphs[scoreKey] = stars;
+
+        await saveProgress();
+        checkCompletion();
+    } catch(e) {
+        console.error(e);
+        evalEl.innerHTML = '<span class="text-red-400 text-xs">评分出错，请再录一次 😊</span>';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FIRESTORE: 保存进度
+// ══════════════════════════════════════════════════════════════
+async function saveProgress() {
+    const payload = {
+        studentName,
+        wordScores:  scores.words,
+        paraScores:  scores.paragraphs,
+        totalScore:  calcTotal()
+    };
+
+    if (!currentAttemptId) {
+        const ref = await addDoc(
+            collection(db, 'lessons', lessonId, 'attempts'),
+            { ...payload, startedAt: serverTimestamp(), completedAt: null }
+        );
+        currentAttemptId = ref.id;
+    } else {
+        await updateDoc(
+            doc(db, 'lessons', lessonId, 'attempts', currentAttemptId),
+            payload
+        );
+    }
+}
+
+function calcTotal() {
+    const w = Object.values(scores.words).reduce((a, b) => a + b, 0) * 10;
+    const p = Object.values(scores.paragraphs).reduce((a, b) => a + b, 0) * 20;
+    return w + p;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  COMPLETION CHECK
+// ══════════════════════════════════════════════════════════════
+function checkCompletion() {
+    const totalWords = currentLesson.words.length;
+    const wordsDone  = Object.keys(scores.words).length;
+
+    if (wordsDone >= totalWords) {
+        const s2 = document.getElementById('stage2');
+        if (s2.classList.contains('hidden')) {
+            s2.classList.remove('hidden');
+            showMsg('🎉 第一关通过！开启全文朗读！');
+            s2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    const totalParas = currentLesson.paragraphs.length;
+    const parasDone  = Object.keys(scores.paragraphs).length;
+
+    if (parasDone >= totalParas) {
+        document.getElementById('finishBtn').classList.remove('hidden');
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FINISH
+// ══════════════════════════════════════════════════════════════
+window.finishLesson = async function() {
+    const total = calcTotal();
+    if (currentAttemptId) {
+        await updateDoc(
+            doc(db, 'lessons', lessonId, 'attempts', currentAttemptId),
+            { totalScore: total, completedAt: serverTimestamp() }
+        );
+    }
+    document.getElementById('finalScore').textContent = total;
+    document.getElementById('finalBanner').classList.remove('hidden');
+    document.getElementById('finishBtn').classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showMsg('🏆 状元及第！太厉害了！');
+};
+
+// ══════════════════════════════════════════════════════════════
+//  ANALYTICS
+// ══════════════════════════════════════════════════════════════
+async function loadAnalytics(id) {
+    try {
+        const [lessonSnap, attSnap] = await Promise.all([
+            getDoc(doc(db, 'lessons', id)),
+            getDocs(query(collection(db, 'lessons', id, 'attempts'), orderBy('startedAt', 'desc')))
+        ]);
+
+        if (!lessonSnap.exists()) {
+            document.getElementById('analyticsContent').innerHTML = '<p class="text-red-400 text-center">课程不存在</p>';
+            return;
+        }
+
+        const lesson   = lessonSnap.data();
+        const attempts = attSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        document.getElementById('analyticsTitle').textContent = lesson.inputText?.slice(0, 40) + '…';
+        renderAnalytics(lesson, attempts);
+    } catch(e) {
+        console.error(e);
+        document.getElementById('analyticsContent').innerHTML = '<p class="text-red-400 text-center">加载失败</p>';
+    }
+}
+
+function renderAnalytics(lesson, attempts) {
+    const el        = document.getElementById('analyticsContent');
+    const completed = attempts.filter(a => a.completedAt);
+    const avgScore  = completed.length
+        ? Math.round(completed.reduce((s, a) => s + (a.totalScore || 0), 0) / completed.length)
+        : 0;
+
+    // 生词平均星
+    const wordAvg = {};
+    lesson.words.forEach(w => {
+        const vals = attempts.map(a => a.wordScores?.[w.word]).filter(v => v != null);
+        wordAvg[w.word] = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+    });
+
+    // 段落平均星
+    const paraAvg = {};
+    lesson.paragraphs.forEach((_, idx) => {
+        const key  = `para-${idx}`;
+        const vals = attempts.map(a => a.paraScores?.[key]).filter(v => v != null);
+        paraAvg[idx] = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+    });
+
+    el.innerHTML = `
+    <!-- 汇总 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        ${[
+            ['👥 参与人数', attempts.length, 'blue'],
+            ['✅ 完成人数', completed.length, 'green'],
+            ['📊 平均得分', avgScore, 'yellow'],
+            ['🏆 最高得分', completed.length ? Math.max(...completed.map(a=>a.totalScore||0)) : '—', 'red']
+        ].map(([label, val, c]) => `
+            <div class="bg-${c}-50 border border-${c}-100 rounded-2xl p-5 text-center">
+                <div class="text-3xl font-bold text-${c}-600 mb-1">${val}</div>
+                <div class="text-gray-500 text-sm">${label}</div>
+            </div>`).join('')}
+    </div>
+
+    <!-- 生词掌握 -->
+    <h3 class="font-bold text-lg text-gray-800 mb-4">📝 生词掌握情况</h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        ${lesson.words.map(w => {
+            const avg = wordAvg[w.word];
+            const stars = avg != null ? Math.round(avg) : 0;
+            const pct   = avg != null ? Math.round(avg / 5 * 100) : 0;
+            const color = pct >= 80 ? 'green' : pct >= 60 ? 'yellow' : 'red';
+            return `
+            <div class="bg-white rounded-2xl p-4 text-center border border-gray-100 shadow-sm">
+                <div class="hanzi-big text-gray-800 text-3xl">${w.word}</div>
+                <div class="text-gray-400 text-xs mb-2">${w.pinyin}</div>
+                <div class="flex justify-center gap-0.5 mb-2">
+                    ${Array(5).fill(0).map((_, i) => `<span class="${i < stars ? 'star-filled' : 'star-empty'}">★</span>`).join('')}
+                </div>
+                <div class="text-xs font-bold text-${color}-600">${avg != null ? avg.toFixed(1) + ' / 5' : '暂无数据'}</div>
+            </div>`;
+        }).join('')}
+    </div>
+
+    <!-- 段落朗读 -->
+    <h3 class="font-bold text-lg text-gray-800 mb-4">📖 段落朗读情况</h3>
+    <div class="space-y-3 mb-10">
+        ${lesson.paragraphs.map((p, idx) => {
+            const avg   = paraAvg[idx];
+            const pct   = avg != null ? Math.round(avg / 5 * 100) : 0;
+            const color = pct >= 80 ? 'green' : pct >= 60 ? 'yellow' : 'red';
+            const bar   = avg != null ? pct : 0;
+            return `
+            <div class="bg-white rounded-2xl p-4 border border-gray-100">
+                <p class="text-gray-700 text-sm mb-3 line-clamp-2">${p}</p>
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div class="h-full bg-${color}-400 rounded-full transition-all" style="width:${bar}%"></div>
+                    </div>
+                    <span class="text-xs font-bold text-${color}-600 w-16 text-right">
+                        ${avg != null ? avg.toFixed(1) + ' / 5' : '暂无'}
+                    </span>
+                </div>
+            </div>`;
+        }).join('')}
+    </div>
+
+    <!-- 得分图表 -->
+    ${completed.length >= 2 ? `
+    <h3 class="font-bold text-lg text-gray-800 mb-4">📈 得分分布</h3>
+    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm mb-10">
+        <canvas id="scoreChart" height="120"></canvas>
+    </div>` : ''}
+
+    <!-- 学生成绩单 -->
+    <h3 class="font-bold text-lg text-gray-800 mb-4">🎓 学生成绩单</h3>
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto mb-10">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b">
+                <tr class="text-left">
+                    <th class="p-4">姓名</th>
+                    <th class="p-4 text-center">总分</th>
+                    <th class="p-4 text-center">完成</th>
+                    ${lesson.words.map(w => `<th class="p-4 text-center">${w.word}</th>`).join('')}
+                    ${lesson.paragraphs.map((_, i) => `<th class="p-4 text-center">段${i+1}</th>`).join('')}
+                    <th class="p-4 text-gray-400 text-xs">时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${attempts.length === 0
+                    ? `<tr><td colspan="20" class="p-8 text-center text-gray-400">还没有学生参与</td></tr>`
+                    : attempts.map(a => {
+                        const done = !!a.completedAt;
+                        const ts   = a.startedAt?.toDate?.()?.toLocaleString('zh-CN', { hour12: false }) || '—';
+                        return `
+                        <tr class="border-t hover:bg-gray-50 transition-colors">
+                            <td class="p-4 font-bold text-gray-800">${a.studentName}</td>
+                            <td class="p-4 text-center font-bold ${done ? 'text-blue-600' : 'text-gray-400'}">${a.totalScore ?? '—'}</td>
+                            <td class="p-4 text-center">${done ? '✅' : '🔄'}</td>
+                            ${lesson.words.map(w => {
+                                const s = a.wordScores?.[w.word];
+                                return `<td class="p-4 text-center">${s != null ? '⭐'.repeat(s) : '—'}</td>`;
+                            }).join('')}
+                            ${lesson.paragraphs.map((_, i) => {
+                                const s = a.paraScores?.[`para-${i}`];
+                                return `<td class="p-4 text-center">${s != null ? '⭐'.repeat(s) : '—'}</td>`;
+                            }).join('')}
+                            <td class="p-4 text-xs text-gray-400">${ts}</td>
+                        </tr>`;
+                    }).join('')}
+            </tbody>
+        </table>
+    </div>`;
+
+    // Chart.js 柱状图
+    if (completed.length >= 2) {
+        const ctx = document.getElementById('scoreChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: completed.map(a => a.studentName),
+                    datasets: [{
+                        label: '总分',
+                        data: completed.map(a => a.totalScore || 0),
+                        backgroundColor: 'rgba(59,130,246,0.5)',
+                        borderColor: 'rgb(59,130,246)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 10 } } }
+                }
+            });
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  GEMINI API
+// ══════════════════════════════════════════════════════════════
+async function fetchGemini(model, body, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+                { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+            );
+            if (res.ok) return res.json();
+            if (res.status === 429) await new Promise(r => setTimeout(r, (i + 1) * 2000));
+            else throw new Error(`HTTP ${res.status}`);
+        } catch(e) {
+            if (i === retries - 1) throw e;
+        }
+    }
+}
+
+async function processWithGemini(text) {
+    const result = await fetchGemini('gemini-2.5-flash-preview-05-20', {
+        contents: [{
+            parts: [{
+                text: `你是一位经验丰富的小学华文老师，专门教一年级学生。请分析以下课文，完成两件事：
+1. 提取 3-4 个最重要的生字或生词（优先选单个汉字，选学生最可能不认识的）
+2. 将课文按自然段或意群分成 2-4 个段落
+
+课文内容：
+${text}
+
+请严格按以下 JSON 格式返回（不要加 markdown 代码块）：
+{
+  "words": [
+    {
+      "word": "字或词",
+      "pinyin": "pīn yīn（带声调符号）",
+      "explanation": "中文解释，10字以内",
+      "imagePrompt": "English prompt for a simple child cartoon illustration",
+      "bushou": "部首（单个汉字）",
+      "bushouMeaning": "部首含义，10字以内，如'三点水，表示水'",
+      "peici": ["配词1", "配词2", "配词3"],
+      "koujue": "记字口诀，20字以内，要押韵或联想，生动有趣，帮助一年级学生记住这个字的写法或意思",
+      "duoyinzi": null
+    }
+  ],
+  "paragraphs": ["第一段", "第二段"]
+}
+
+重要说明：
+- bushou：填部首本身的汉字，例如"氵""木""口"
+- bushouMeaning：简短说明部首代表的意思
+- peici：包含该字的常用词语，例如"水"→["水果","雨水","水桶"]
+- koujue：联想或顺口溜，例如"水"→"三点水弯弯流，河里小鱼乐悠悠"
+- duoyinzi：若该字有多个读音，填入数组，例如：
+  [{"pinyin":"háng","meaning":"行业、排列","example":"银行"},{"pinyin":"xíng","meaning":"行走、可以","example":"行走"}]
+  若只有一个读音，填 null`
+            }]
+        }],
+        generationConfig: { responseMimeType: 'application/json' }
+    });
+    return JSON.parse(result.candidates[0].content.parts[0].text);
+}
+
+// ── 图片生成 (hid = hex DOM id) ──────────────────────────────
+async function generateImage(hid, prompt) {
+    const el = document.getElementById(`img-${hid}`);
+    if (!el) return;
+    try {
+        const res = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENAI_KEY}`
+            },
+            body: JSON.stringify({
+                model:           'dall-e-3',
+                prompt:          `Simple cute cartoon illustration for Chinese primary school students. Colorful, white background, friendly and clear. Subject: ${prompt}`,
+                n:               1,
+                size:            '1024x1024',
+                response_format: 'b64_json'
+            })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            const b64  = data.data?.[0]?.b64_json;
+            if (b64) {
+                el.innerHTML = `<img src="data:image/png;base64,${b64}" class="w-full h-full object-cover">`;
+                return;
+            }
+        }
+    } catch(e) { /* fallback below */ }
+    el.textContent = '🖼️';
+}
+
+// ── TTS ───────────────────────────────────────────────────────
+window.speakText = async function(text) {
+    if (!text) return;
+    try {
+        const result = await fetchGemini('gemini-2.5-flash-preview-tts:generateContent', {
+            contents: [{ parts: [{ text }] }],
+            generationConfig: {
+                responseModalities: ['AUDIO'],
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Aoede' } } }
+            }
+        });
+        const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (audioData) playPCM(audioData, 24000);
+    } catch(e) { showMsg('语音播放失败'); }
+};
+
+function playPCM(b64, rate) {
+    const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+    const hdr = createWavHeader(buf.byteLength, rate);
+    const url = URL.createObjectURL(new Blob([hdr, buf], { type: 'audio/wav' }));
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    audio.play();
+}
+
+function createWavHeader(len, rate) {
+    const h = new ArrayBuffer(44), v = new DataView(h);
+    v.setUint32(0, 0x46464952, true); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x45564157, true);
+    v.setUint32(12, 0x20746d66, true); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
+    v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x61746164, true);
+    v.setUint32(40, len, true);
+    return h;
+}
+
+// ── Utilities ─────────────────────────────────────────────────
+function show(id) {
+    ['teacherView', 'studentNameView', 'practiceView', 'analyticsView']
+        .forEach(v => document.getElementById(v)?.classList.add('hidden'));
+    document.getElementById(id)?.classList.remove('hidden');
+}
+
+window.showMsg = function(text) {
+    const box = document.getElementById('messageBox');
+    document.getElementById('messageContent').textContent = text;
+    box.classList.remove('hidden');
+    clearTimeout(box._timer);
+    box._timer = setTimeout(() => box.classList.add('hidden'), 3000);
+};
+
+function setLoading(on, text = '小老师准备中...') {
+    document.getElementById('loaderText').textContent = text;
+    document.getElementById('globalLoader').classList.toggle('hidden', !on);
+}
+
+// ── START ──────────────────────────────────────────────────────
+init().catch(console.error);
+</script>
+</body>
+</html>
