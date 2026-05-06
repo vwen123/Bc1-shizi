@@ -177,34 +177,32 @@
 </div>
 
 <!-- ══════════════════════════════════════
-     FIREBASE + APP SCRIPT
+     GOOGLE APPS SCRIPT
 ══════════════════════════════════════ -->
 <script type="module">
-import { initializeApp }          from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, updateDoc,
-         getDocs, serverTimestamp, query, orderBy }
-                                  from 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
-
 // ============================================================
 //  ⚙️  CONFIGURATION — 请填入你的密钥
 // ============================================================
-const FIREBASE_CONFIG = {
-    apiKey:            "FILL_IN_FIREBASE_API_KEY",
-    authDomain:        "FILL_IN.firebaseapp.com",
-    projectId:         "FILL_IN_PROJECT_ID",
-    storageBucket:     "FILL_IN.appspot.com",
-    messagingSenderId: "FILL_IN",
-    appId:             "FILL_IN"
-};
-
-// ⚠️ Gemini key: 在 Google Cloud Console 限制此 key 只允许你的网域（HTTP referrers）
+// GAS Web App URL（部署后从 Google Apps Script 复制）
+const GAS_URL    = "FILL_IN_GAS_URL";
 const GEMINI_KEY = "FILL_IN_GEMINI_API_KEY";
-// ⚠️ OpenAI key: 在 platform.openai.com 限制此 key 只允许你的网域
 const OPENAI_KEY = "FILL_IN_OPENAI_API_KEY";
 // ============================================================
 
-const app = initializeApp(FIREBASE_CONFIG);
-const db  = getFirestore(app);
+// ── GAS 请求封装 ──────────────────────────────────────────────
+async function gasGet(action, params = {}) {
+    const qs  = new URLSearchParams({ action, ...params }).toString();
+    const res = await fetch(`${GAS_URL}?${qs}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'GAS error');
+    return data;
+}
+async function gasPost(body) {
+    const res  = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'GAS error');
+    return data;
+}
 
 // ── 路由状态 ──────────────────────────────────────────────────
 const params   = new URLSearchParams(location.search);
@@ -255,13 +253,7 @@ window.createLesson = async function() {
     try {
         const data = await processWithGemini(text);
 
-        const ref = doc(collection(db, 'lessons'));
-        await setDoc(ref, {
-            inputText:  text,
-            words:      data.words,
-            paragraphs: data.paragraphs,
-            createdAt:  serverTimestamp()
-        });
+        await gasPost({ action: 'createLesson', inputText: text, words: data.words, paragraphs: data.paragraphs });
 
         document.getElementById('lessonInput').value = '';
         showMsg('✅ 课程创建成功！');
@@ -278,33 +270,29 @@ window.createLesson = async function() {
 async function loadTeacherLessons() {
     const container = document.getElementById('teacherLessonList');
     try {
-        const snap = await getDocs(query(collection(db, 'lessons'), orderBy('createdAt', 'desc')));
+        const { lessons } = await gasGet('getLessons');
 
-        if (snap.empty) {
+        if (!lessons.length) {
             container.innerHTML = '<p class="text-gray-400 text-center py-10">还没有课程，创建第一个吧 ↑</p>';
             return;
         }
 
-        const items = await Promise.all(snap.docs.map(async d => {
-            const data = d.data();
-            const attSnap = await getDocs(collection(db, 'lessons', d.id, 'attempts'));
-            const completedCount = attSnap.docs.filter(a => a.data().completedAt).length;
-            const shareUrl     = `${location.origin}${location.pathname}?lesson=${d.id}`;
-            const analyticsUrl = `${location.origin}${location.pathname}?lesson=${d.id}&view=analytics`;
-            const date = data.createdAt?.toDate().toLocaleDateString('zh-CN') || '—';
-
+        container.innerHTML = lessons.map(d => {
+            const shareUrl     = `${location.origin}${location.pathname}?lesson=${d.lessonId}`;
+            const analyticsUrl = `${location.origin}${location.pathname}?lesson=${d.lessonId}&view=analytics`;
+            const date = d.createdAt ? new Date(d.createdAt).toLocaleDateString('zh-CN') : '—';
             return `
             <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm card-hover">
                 <div class="flex justify-between items-start mb-2">
-                    <p class="font-bold text-gray-800 line-clamp-2 flex-1 mr-4">${data.inputText?.slice(0, 60)}...</p>
+                    <p class="font-bold text-gray-800 line-clamp-2 flex-1 mr-4">${d.inputText?.slice(0, 60)}...</p>
                     <span class="text-xs text-gray-400 whitespace-nowrap">${date}</span>
                 </div>
                 <div class="flex gap-3 text-xs text-gray-500 mb-4">
-                    <span>📝 生词：${data.words?.map(w => w.word).join('、') || '—'}</span>
+                    <span>📝 生词：${d.wordsPreview || '—'}</span>
                     <span>|</span>
-                    <span>📖 ${data.paragraphs?.length || 0} 段</span>
+                    <span>📖 ${d.paragraphCount || 0} 段</span>
                     <span>|</span>
-                    <span>👤 ${attSnap.size} 人参与，${completedCount} 人完成</span>
+                    <span>👤 ${d.attemptCount || 0} 人参与，${d.completedCount || 0} 人完成</span>
                 </div>
                 <div class="flex gap-2 flex-wrap">
                     <button onclick="navigator.clipboard.writeText('${shareUrl}').then(()=>window.showMsg('✅ 学生链接已复制！'))"
@@ -317,12 +305,10 @@ async function loadTeacherLessons() {
                     </a>
                 </div>
             </div>`;
-        }));
-
-        container.innerHTML = items.join('');
+        }).join('');
     } catch(e) {
         console.error(e);
-        container.innerHTML = '<p class="text-red-400 text-center py-8">加载失败，请检查 Firebase 配置</p>';
+        container.innerHTML = '<p class="text-red-400 text-center py-8">加载失败，请检查 GAS 设置</p>';
     }
 }
 
@@ -344,8 +330,8 @@ window.startPractice = function() {
 // ── 加载课程 ──────────────────────────────────────────────────
 async function loadLesson(id) {
     try {
-        const snap = await getDoc(doc(db, 'lessons', id));
-        return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+        const data = await gasGet('getLesson', { lessonId: id });
+        return data;
     } catch(e) { return null; }
 }
 
@@ -694,28 +680,20 @@ async function evaluate(type, id, scoreKey, b64, target, mime) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  FIRESTORE: 保存进度
+//  GAS: 保存进度
 // ══════════════════════════════════════════════════════════════
 async function saveProgress() {
     const payload = {
+        action:      'saveAttempt',
+        attemptId:   currentAttemptId,
+        lessonId,
         studentName,
         wordScores:  scores.words,
         paraScores:  scores.paragraphs,
         totalScore:  calcTotal()
     };
-
-    if (!currentAttemptId) {
-        const ref = await addDoc(
-            collection(db, 'lessons', lessonId, 'attempts'),
-            { ...payload, startedAt: serverTimestamp(), completedAt: null }
-        );
-        currentAttemptId = ref.id;
-    } else {
-        await updateDoc(
-            doc(db, 'lessons', lessonId, 'attempts', currentAttemptId),
-            payload
-        );
-    }
+    const res = await gasPost(payload);
+    if (!currentAttemptId) currentAttemptId = res.attemptId;
 }
 
 function calcTotal() {
@@ -754,10 +732,12 @@ function checkCompletion() {
 window.finishLesson = async function() {
     const total = calcTotal();
     if (currentAttemptId) {
-        await updateDoc(
-            doc(db, 'lessons', lessonId, 'attempts', currentAttemptId),
-            { totalScore: total, completedAt: serverTimestamp() }
-        );
+        await gasPost({
+            action: 'saveAttempt', attemptId: currentAttemptId,
+            lessonId, studentName,
+            wordScores: scores.words, paraScores: scores.paragraphs,
+            totalScore: total, completedAt: new Date().toISOString()
+        });
     }
     document.getElementById('finalScore').textContent = total;
     document.getElementById('finalBanner').classList.remove('hidden');
@@ -771,19 +751,7 @@ window.finishLesson = async function() {
 // ══════════════════════════════════════════════════════════════
 async function loadAnalytics(id) {
     try {
-        const [lessonSnap, attSnap] = await Promise.all([
-            getDoc(doc(db, 'lessons', id)),
-            getDocs(query(collection(db, 'lessons', id, 'attempts'), orderBy('startedAt', 'desc')))
-        ]);
-
-        if (!lessonSnap.exists()) {
-            document.getElementById('analyticsContent').innerHTML = '<p class="text-red-400 text-center">课程不存在</p>';
-            return;
-        }
-
-        const lesson   = lessonSnap.data();
-        const attempts = attSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
+        const { lesson, attempts } = await gasGet('getAnalytics', { lessonId: id });
         document.getElementById('analyticsTitle').textContent = lesson.inputText?.slice(0, 40) + '…';
         renderAnalytics(lesson, attempts);
     } catch(e) {
