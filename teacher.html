@@ -302,88 +302,28 @@ function renderLessons() {
             </div>
         </div>
 
-        <!-- 生词 + 图片状态 -->
+        <!-- 生词列表 -->
         <div class="border-t border-slate-50 px-6 py-4 bg-slate-50/50">
-            <div class="flex items-center justify-between mb-3">
-                <span class="text-xs font-black text-slate-500">生词图片 (${l.imagesReady}/${l.totalWords} 已生成)</span>
-                <button onclick="generateAll('${l.lessonId}')" id="genAll-${l.lessonId}"
-                    class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-full font-bold transition-all ${l.imagesReady === l.totalWords ? 'opacity-50 cursor-default' : ''}">
-                    <i class="fas fa-magic mr-1"></i>${l.imagesReady === l.totalWords ? '图片已就绪' : '批量生成图片'}
-                </button>
-            </div>
-            <div class="flex flex-wrap gap-3" id="words-${l.lessonId}">
-                ${(l.words || []).map((w, i) => renderWordChip(l.lessonId, w, i)).join('')}
+            <div class="flex flex-wrap gap-3">
+                ${(l.words || []).map((w) => renderWordChip(w)).join('')}
             </div>
         </div>
     </div>`).join('');
 }
 
-function renderWordChip(lessonId, w, i) {
-    const hasImg = !!w.imgUrl;
+function renderWordChip(w) {
     return `
     <div class="flex items-center gap-2 bg-white rounded-2xl px-3 py-2 border border-slate-100 shadow-sm">
-        <div id="img-chip-${lessonId}-${i}">
-            ${hasImg
-                ? `<img src="${w.imgUrl}" class="img-cell" onerror="this.parentNode.innerHTML='<div class=\\'img-placeholder bg-slate-100\\'>${w.emoji||'📚'}</div>'">`
-                : `<div class="img-placeholder bg-slate-100">${w.emoji || '📚'}</div>`}
-        </div>
+        ${w.imgUrl
+            ? `<img src="${w.imgUrl}" class="img-cell" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+            : ''}
+        <div class="img-placeholder bg-slate-100" ${w.imgUrl ? 'style="display:none"' : ''}>${w.emoji||'📚'}</div>
         <div>
             <div class="font-bold text-slate-800 text-sm">${w.word}</div>
             <div class="text-xs text-slate-400">${w.pinyin}</div>
         </div>
-        <button onclick="generateOne('${lessonId}', ${i})" id="genBtn-${lessonId}-${i}"
-            title="${hasImg ? '重新生成' : '生成图片'}"
-            class="w-7 h-7 rounded-xl ${hasImg ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-600'} hover:opacity-70 flex items-center justify-center text-xs transition-all">
-            <i class="fas fa-${hasImg ? 'redo' : 'magic'}"></i>
-        </button>
+        ${!w.imgUrl ? '<span class="text-[10px] text-slate-300 ml-1">无图</span>' : ''}
     </div>`;
-}
-
-// ── 生成单张图片 ──────────────────────────────────────────────
-async function generateOne(lessonId, wordIndex) {
-    const btn     = document.getElementById(`genBtn-${lessonId}-${wordIndex}`);
-    const imgCell = document.getElementById(`img-chip-${lessonId}-${wordIndex}`);
-
-    btn.innerHTML = '<i class="fas fa-spinner spin"></i>';
-    btn.disabled  = true;
-    imgCell.innerHTML = `<div class="img-placeholder bg-blue-50"><i class="fas fa-spinner spin text-blue-400"></i></div>`;
-
-    try {
-        const res = await gasPost({ action: 'generateOneImage', lessonId, wordIndex });
-        if (!res.ok) throw new Error(res.error);
-
-        imgCell.innerHTML = `<img src="${res.imgUrl}" class="img-cell">`;
-        btn.innerHTML = '<i class="fas fa-check text-green-500"></i>';
-        toast(`「${res.word}」图片生成完毕 ✅`);
-        await loadLessons(); // 刷新状态
-    } catch(e) {
-        imgCell.innerHTML = `<div class="img-placeholder bg-red-50 text-red-400 text-xs">失败</div>`;
-        btn.innerHTML = '<i class="fas fa-redo"></i>';
-        btn.disabled  = false;
-        toast('生成失败：' + e.message, true);
-    }
-}
-
-// ── 批量生成 ──────────────────────────────────────────────────
-async function generateAll(lessonId) {
-    const lesson = allLessons.find(l => l.lessonId === lessonId);
-    if (!lesson) return;
-    const words = lesson.words || [];
-    const pending = words.map((w, i) => ({ w, i })).filter(({ w }) => !w.imgUrl);
-    if (!pending.length) { toast('所有图片已就绪'); return; }
-
-    const btn = document.getElementById(`genAll-${lessonId}`);
-    btn.innerHTML = `<i class="fas fa-spinner spin mr-1"></i> 生成中 (0/${pending.length})`;
-    btn.disabled = true;
-
-    let done = 0;
-    for (const { i } of pending) {
-        btn.innerHTML = `<i class="fas fa-spinner spin mr-1"></i> 生成中 (${done}/${pending.length})`;
-        await generateOne(lessonId, i);
-        done++;
-    }
-    btn.innerHTML = `<i class="fas fa-check mr-1"></i> 全部完成`;
-    btn.disabled  = false;
 }
 
 // ── 表单：新建 / 编辑 ──────────────────────────────────────────
@@ -418,9 +358,9 @@ function addWordRow(w) {
     const pyId    = 'py-'    + Date.now() + Math.random().toString(36).slice(2);
 
     row.innerHTML = `
-        <div class="flex flex-col gap-1 flex-1">
+        <div class="flex flex-col gap-2 flex-1">
             <div class="flex gap-2">
-                <div class="flex-1">
+                <div class="w-24">
                     <label class="text-[10px] font-black text-slate-400 mb-0.5 block">词语 *</label>
                     <input id="${wordId}" placeholder="花儿" value="${w?.word||''}"
                         class="w-full p-2.5 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 font-bold text-center"
@@ -435,15 +375,20 @@ function addWordRow(w) {
                     <input id="${pyId}" placeholder="huā r" value="${w?.pinyin||''}"
                         class="w-full p-2.5 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 text-red-500 font-bold">
                 </div>
-                <div class="w-16">
-                    <label class="text-[10px] font-black text-slate-400 mb-0.5 block">Emoji</label>
+                <div class="w-14">
+                    <label class="text-[10px] font-black text-slate-400 mb-0.5 block">备用图标</label>
                     <input placeholder="🌸" value="${w?.emoji||''}"
                         class="w-full p-2.5 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 text-center">
                 </div>
             </div>
+            <div>
+                <label class="text-[10px] font-black text-slate-400 mb-0.5 block">图片网址（可不填，由老师预先提供）</label>
+                <input placeholder="https://vwen123.github.io/Bc1-shizi/images/hua-er.png" value="${w?.imgUrl||''}"
+                    class="w-full p-2.5 border-2 border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-400 text-slate-500">
+            </div>
         </div>
         <button onclick="this.closest('div.flex').remove()"
-            class="w-9 h-9 rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-100 flex items-center justify-center text-sm shrink-0 self-center mt-4">
+            class="w-9 h-9 rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-100 flex items-center justify-center text-sm shrink-0 self-start mt-5">
             <i class="fas fa-times"></i>
         </button>`;
     container.appendChild(row);
@@ -461,10 +406,10 @@ function getFormWords() {
     return [...rows].map(row => {
         const inputs = row.querySelectorAll('input');
         return {
-            word:    inputs[0]?.value.trim() || '',
-            pinyin:  inputs[1]?.value.trim() || '',
-            emoji:   inputs[2]?.value.trim() || '📚',
-            imgUrl:  ''
+            word:   inputs[0]?.value.trim() || '',
+            pinyin: inputs[1]?.value.trim() || '',
+            emoji:  inputs[2]?.value.trim() || '📚',
+            imgUrl: inputs[3]?.value.trim() || ''
         };
     }).filter(w => w.word);
 }
