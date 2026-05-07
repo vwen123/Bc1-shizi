@@ -129,7 +129,7 @@
 // ════════════════════════════════════════
 //  课程数据（不依赖 API）
 // ════════════════════════════════════════
-const OPENAI_KEY = ""; // ← 填入你的 OpenAI key（不推送到 GitHub）
+const GEMINI_KEY = "AIzaSyAwrUxZsrhNWiz3PbtTD7w4TkZQf-w8gTw";
 
 const LESSONS = [
     // ── 第一单元：新的开始 ──────────────────────────────────────
@@ -313,7 +313,7 @@ function renderWords(words) {
     });
 
     // 异步生成图片（不阻塞页面渲染）
-    if (OPENAI_KEY) generateImages(words);
+    generateImages(words);
 }
 
 // ════════════════════════════════════════
@@ -337,22 +337,19 @@ async function generateOneImage(w, id) {
     if (loader) loader.classList.remove('hidden');
 
     try {
-        const res = await fetch('https://api.openai.com/v1/images/generations', {
-            method: 'POST',
-            headers: {
-                'Content-Type':  'application/json',
-                'Authorization': `Bearer ${OPENAI_KEY}`
-            },
-            body: JSON.stringify({
-                model:           'dall-e-3',
-                prompt:          `Cute simple cartoon illustration for Chinese primary school children, colorful, white background, child-friendly. Subject: ${w.img}`,
-                n:               1,
-                size:            '1024x1024',
-                response_format: 'b64_json'
-            })
-        });
+        const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_KEY}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instances:  [{ prompt: `Cute simple cartoon illustration for Chinese primary school children, colorful, white background, child-friendly. Subject: ${w.img}` }],
+                    parameters: { sampleCount: 1 }
+                })
+            }
+        );
         const data = await res.json();
-        const b64  = data.data?.[0]?.b64_json;
+        const b64  = data.predictions?.[0]?.bytesBase64Encoded;
         if (b64) {
             const src = `data:image/png;base64,${b64}`;
             imgCache[w.word] = src;
