@@ -189,6 +189,8 @@ let totalItems    = 0;
 let currentAttemptId = null;
 let activeQuizWriter = null;
 let activeQuizId     = null;
+let _rec             = null;   // 当前录音实例
+let _recId           = null;   // 当前录音的 id
 
 // ════════════════════════════════════════
 //  初始化 — 从 GAS 加载课程
@@ -353,65 +355,181 @@ function speak(text) {
 }
 
 // ════════════════════════════════════════
-//  朗读识别 + 实时评分
+//  朗读识别 + 实时评分（改进版）
 // ════════════════════════════════════════
 function startRecognition(target, id) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { showMsg('请使用 Chrome 或 Edge 浏览器'); return; }
 
-    const recognition       = new SR();
-    recognition.lang        = 'zh-CN';
-    recognition.interimResults = true;
-
     const btn     = document.getElementById(`btn-${id}`);
     const display = document.getElementById(`display-${id}`);
     const scoreEl = document.getElementById(`score-${id}`);
+    if (!btn) return;
 
-    btn.classList.add('rec-active');
-    if (display) display.textContent = '🎤 正在聆听...';
+    // ── 点同一按钮 = 停止当前录音 ────────────────────────────
+    if (_recId === id && _rec) {
+        _rec.stop();
+        return;
+    }
+    // 停止其他正在进行的录音
+    if (_rec) { try { _rec.stop(); } catch(e) {} _rec = null; _recId = null; }
 
-    let finalT = '';
-    recognition.onresult = (e) => {
-        let interim = '';
-        for (let i = e.resultIndex; i < e.results.length; ++i) {
-            if (e.results[i].isFinal) finalT += e.results[i][0].transcript;
-            else interim += e.results[i][0].transcript;
-        }
-        if (display) display.innerHTML = highlightMatch(target, finalT || interim);
-    };
+    const recognition         = new SR();
+    recognition.lang          = 'zh-CN';
+    recognition.continuous    = true;    // 持续聆听，不会中途断掉
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
 
-    recognition.onend = () => {
+    _rec   = recognition;
+    _recId = id;
+
+    // ── 判断按钮形状（词语卡是正方形，段落是长方形）────────────
+    const isSquare = btn.classList.contains('aspect-square');
+
+    // 保存原始样式
+    const origBg   = isSquare ? 'bg-rose-50 text-rose-500 hover:bg-rose-100'
+                              : 'bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-100';
+    const recBg    = 'bg-red-500 text-white';
+
+    btn.className  = btn.className.replace(origBg, recBg) + ' rec-active';
+    btn.innerHTML  = isSquare
+        ? '<i class="fas fa-stop"></i>'
+        : '<i class="fas fa-stop mr-2"></i>停止';
+
+    if (display) display.innerHTML =
+        '<span class="text-slate-400 text-sm animate-pulse">🎤 请开始朗读...</span>';
+
+    let accumulated  = '';
+    let silenceTimer = null;
+
+    // ── 完成录音 → 计分 ──────────────────────────────────────
+    const finish = (spoken) => {
+        if (_rec !== recognition) return;
+        _rec = null; _recId = null;
+        clearTimeout(silenceTimer);
+
+        // 还原按钮
         btn.classList.remove('rec-active');
-        if (!finalT) {
-            if (display) display.textContent = '';
+        btn.className = btn.className.replace(recBg, origBg).replace(' rec-active','');
+        btn.innerHTML = isSquare
+            ? '<i class="fas fa-microphone"></i>'
+            : '<i class="fas fa-microphone mr-2"></i>朗读';
+
+        const text = spoken.trim();
+        if (!text) {
+            if (display) display.innerHTML =
+                '<span class="text-slate-300 text-sm">没有识别到声音，请靠近麦克风再试 🎤</span>';
             return;
         }
-        const score = calcScore(target, finalT);
+
+        const score = calcScore(target, text);
+        const stars = score >= 90 ? 5 : score >= 75 ? 4 : score >= 55 ? 3 : score >= 30 ? 2 : 1;
+        const msgs  = ['再来一次！🌈','继续练习！💪','不错，加油！😊','读得很好！👍','完美！🌟'];
+
+        if (display) display.innerHTML = highlightMatch(target, text);
+        if (scoreEl) scoreEl.innerHTML = `
+            <div class="flex items-center flex-wrap gap-1.5 mt-1">
+                <span class="text-amber-400 text-lg leading-none">${'⭐'.repeat(stars)}<span class="opacity-20">${'☆'.repeat(5-stars)}</span></span>
+                <span class="font-black text-slate-700">${score}分</span>
+                <span class="text-slate-400 text-xs">${msgs[stars-1]}</span>
+            </div>
+            <div class="text-slate-300 text-xs mt-0.5 truncate">识别：${text}</div>`;
+
         updateItemScore(id, score);
-        const stars = Math.ceil(score / 20);
-        if (scoreEl) scoreEl.innerHTML = `<span class="text-amber-500">${'⭐'.repeat(Math.max(1,stars))} ${score}分</span>`;
         saveAttemptToGAS();
         checkAllDone();
     };
-    recognition.start();
+
+    // ── 事件处理 ──────────────────────────────────────────────
+    recognition.onspeechstart = () => {
+        if (display && !accumulated)
+            display.innerHTML = '<span class="text-blue-400 text-sm"><i class="fas fa-circle text-red-500 animate-pulse text-xs mr-1"></i>检测到声音，继续读...</span>';
+    };
+
+    recognition.onresult = (e) => {
+        let interim = '', final = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) final   += e.results[i][0].transcript;
+            else                      interim += e.results[i][0].transcript;
+        }
+        if (final) accumulated += final;
+
+        // 实时高亮
+        const current = accumulated + interim;
+        if (display && current)
+            display.innerHTML = highlightMatch(target, current);
+
+        // 停顿 1.8 秒后自动结束
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => { try { recognition.stop(); } catch(e){} }, 1800);
+    };
+
+    recognition.onerror = (e) => {
+        _rec = null; _recId = null;
+        clearTimeout(silenceTimer);
+        btn.classList.remove('rec-active');
+        btn.className = btn.className.replace(recBg, origBg).replace(' rec-active','');
+        btn.innerHTML = isSquare
+            ? '<i class="fas fa-microphone"></i>'
+            : '<i class="fas fa-microphone mr-2"></i>朗读';
+
+        const errMsgs = {
+            'not-allowed':   '请在浏览器设置中允许使用麦克风 🎤',
+            'no-speech':     '没有检测到声音，请再试一次',
+            'network':       '网络问题，请检查连接',
+            'audio-capture': '无法访问麦克风',
+            'aborted':       ''
+        };
+        const msg = errMsgs[e.error] ?? '识别出错，请重试';
+        if (msg && display) display.innerHTML = `<span class="text-red-400 text-sm">${msg}</span>`;
+    };
+
+    recognition.onend = () => { finish(accumulated); };
+
+    try { recognition.start(); }
+    catch(e) { _rec = null; _recId = null; showMsg('无法启动录音：' + e.message); }
 }
 
+// ── 字符高亮（按顺序匹配，颜色更准确）────────────────────────
 function highlightMatch(target, spoken) {
-    const set = new Set([...spoken]);
-    return [...target].map(c =>
-        /[，。！？、]/.test(c) ? `<span class="char-punc">${c}</span>`
-        : set.has(c)           ? `<span class="char-hit">${c}</span>`
-        :                        `<span class="char-miss">${c}</span>`
-    ).join('');
+    if (!spoken) return '';
+    const cleanS = spoken.replace(/\s/g, '');
+    // 顺序扫描：目标文字在识别结果中是否按顺序出现
+    const sChars = [...cleanS];
+    let si = 0;
+    return [...target].map(c => {
+        if (/[，。！？、\s]/.test(c)) return `<span class="char-punc">${c}</span>`;
+        while (si < sChars.length && sChars[si] !== c) si++;
+        if (si < sChars.length) { si++; return `<span class="char-hit">${c}</span>`; }
+        return `<span class="char-miss">${c}</span>`;
+    }).join('');
 }
 
+// ── 评分（顺序匹配 60% + 字符匹配 40%）──────────────────────
 function calcScore(target, spoken) {
-    const t = target.replace(/[，。！？、]/g, '');
-    const s = spoken.replace(/[，。！？、]/g, '');
-    let hits = 0;
-    const arr = [...s];
-    [...t].forEach(c => { const i = arr.indexOf(c); if (i !== -1) { hits++; arr.splice(i, 1); } });
-    return Math.round((hits / Math.max(t.length, 1)) * 100);
+    const clean = s => [...s].filter(c => /[一-鿿]/.test(c));
+    const t = clean(target);
+    const s = clean(spoken);
+    if (!t.length) return 0;
+    if (!s.length) return 0;
+
+    // 顺序匹配（按顺序找到多少目标字）
+    let si = 0, seqHits = 0;
+    for (const tc of t) {
+        while (si < s.length && s[si] !== tc) si++;
+        if (si < s.length) { seqHits++; si++; }
+    }
+
+    // 字符匹配（不管顺序）
+    let setHits = 0;
+    const sTemp = [...s];
+    for (const tc of t) {
+        const idx = sTemp.indexOf(tc);
+        if (idx !== -1) { setHits++; sTemp.splice(idx, 1); }
+    }
+
+    const score = (seqHits / t.length * 0.6 + setHits / t.length * 0.4) * 100;
+    return Math.round(Math.min(100, score));
 }
 
 // ════════════════════════════════════════
