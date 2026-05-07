@@ -3,1021 +3,516 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小状元识字朗读</title>
+    <title>小状元识字</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Noto Sans SC', sans-serif; background: linear-gradient(135deg, #f0f9ff, #e0f2fe); min-height: 100vh; }
-        .hanzi-big { font-family: 'Ma Shan Zheng', cursive; font-size: 3rem; line-height: 1.2; }
-        .pinyin { color: #ef4444; font-weight: bold; font-size: 0.8rem; }
-        .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
-        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.1); }
-        .pulse-ring { animation: pulseRing 1.5s infinite; }
-        @keyframes pulseRing {
-            0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
-            70%  { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
-            100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-        }
-        .slide-in { animation: slideIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
-        @keyframes slideIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        .star-filled { color: #fbbf24; }
-        .star-empty  { color: #d1d5db; }
-        .line-clamp-2 { overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+        body { font-family: 'Noto Sans SC', sans-serif; background: #f0f7ff; min-height: 100vh; }
+        .hanzi { font-family: 'Ma Shan Zheng', cursive; }
 
-        /* ── 生字卡片 ── */
-        .section-chip { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
-        .hw-box { border: 2px dashed #e5e7eb; border-radius: 1rem; background: #fafafa; padding: 0.5rem; display: flex; flex-direction: column; align-items: center; }
-        .hw-writers { display: flex; gap: 4px; justify-content: center; align-items: center; }
-        /* Stroke order grid bg lines */
-        .hw-box svg { border-radius: 0.5rem; }
-        .tab-btn { flex: 1; padding: 0.4rem; border-radius: 0.75rem; font-size: 0.7rem; font-weight: 700; transition: all 0.15s; }
-        .tab-btn.active { background: #3b82f6; color: white; }
-        .tab-btn:not(.active) { background: #eff6ff; color: #3b82f6; }
+        /* 课程卡 */
+        .lesson-card { transition: all 0.2s; cursor: pointer; }
+        .lesson-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(59,130,246,0.15); border-color: #3b82f6; }
+
+        /* 录音动画 */
+        .rec-pulse { animation: recPulse 1s infinite; }
+        @keyframes recPulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.05)} }
+
+        /* 字符匹配 */
+        .char-hit  { color:#16a34a; font-weight:bold; }
+        .char-miss { color:#d1d5db; }
+        .char-punc { color:#9ca3af; }
+
+        /* 奖励弹窗 */
+        .reward-in { animation: rewardPop 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
+        @keyframes rewardPop { from{opacity:0;transform:scale(0.6)} to{opacity:1;transform:scale(1)} }
+
+        /* 彩屑 */
+        .confetti { position:fixed; width:8px; height:8px; border-radius:2px; animation:fall 2.5s linear forwards; }
+        @keyframes fall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
+
+        /* 进度条 */
+        #progressBar { transition: width 0.5s ease; }
+
+        /* 生词卡渐变 */
+        .grad-0{background:linear-gradient(135deg,#667eea,#764ba2)}
+        .grad-1{background:linear-gradient(135deg,#f093fb,#f5576c)}
+        .grad-2{background:linear-gradient(135deg,#4facfe,#00f2fe)}
+        .grad-3{background:linear-gradient(135deg,#43e97b,#38f9d7)}
+        .grad-4{background:linear-gradient(135deg,#fa709a,#fee140)}
+        .grad-5{background:linear-gradient(135deg,#a18cd1,#fbc2eb)}
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body>
 
-<!-- ══════════════════════════════════════
-     VIEW 1: 老师控制台
-══════════════════════════════════════ -->
-<div id="teacherView" class="hidden max-w-4xl mx-auto">
-    <header class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-blue-600 tracking-widest">🌟 小状元识字朗读</h1>
-        <p class="text-gray-500 mt-1">老师控制台</p>
-    </header>
+<!-- ════════════════════════════════════════
+     界面一：登录与选课
+════════════════════════════════════════ -->
+<div id="screenStart" class="max-w-xl mx-auto px-4 py-10">
+    <div class="bg-white rounded-[2rem] shadow-xl border-t-8 border-blue-500 p-8">
+        <h1 class="text-4xl font-black text-blue-600 text-center mb-8 tracking-wider">🌟 小状元识字</h1>
 
-    <!-- Create lesson -->
-    <div class="bg-white rounded-3xl shadow-lg p-6 mb-8 border-2 border-blue-100">
-        <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <i class="fas fa-plus-circle text-blue-500"></i> 创建新课程
-        </h2>
+        <label class="text-sm font-bold text-gray-500 block mb-1 ml-1">第一步：输入你的名字</label>
+        <input id="inputName" type="text" placeholder="请输入名字…" maxlength="10"
+            class="w-full p-4 border-2 border-blue-100 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-400 bg-blue-50/30 mb-6">
 
-        <!-- 课文 -->
-        <label class="text-sm font-bold text-gray-600 mb-1 block">📖 课文内容（按 Enter 分段）</label>
-        <textarea id="lessonInput" rows="4" placeholder="在此粘贴课文内容，每行为一段..."
-            class="w-full p-4 border-2 border-blue-100 rounded-2xl focus:outline-none focus:border-blue-400 text-base mb-5 resize-none"></textarea>
-
-        <!-- 生词 -->
-        <div class="flex items-center justify-between mb-3">
-            <label class="text-sm font-bold text-gray-600">📝 生词列表</label>
-            <button onclick="window.addWordEntry()"
-                class="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full font-bold hover:bg-blue-200 transition-all flex items-center gap-1">
-                <i class="fas fa-plus"></i> 添加生词
-            </button>
-        </div>
-        <div id="wordEntries" class="space-y-3 mb-5"></div>
-        <p id="wordHint" class="text-gray-400 text-xs text-center py-3">点击「添加生词」开始填写</p>
-
-        <div class="flex justify-end">
-            <button onclick="window.createLesson()"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition-all active:scale-95">
-                <i class="fas fa-save"></i> 储存课程
-            </button>
-        </div>
-    </div>
-
-    <!-- Lesson list -->
-    <h2 class="text-lg font-bold text-gray-700 mb-4 flex items-center gap-2">
-        <i class="fas fa-book-open text-indigo-500"></i> 已有课程
-    </h2>
-    <div id="teacherLessonList" class="space-y-3">
-        <p class="text-gray-400 text-center py-10">正在加载...</p>
+        <label class="text-sm font-bold text-gray-500 block mb-3 ml-1">第二步：选择课文</label>
+        <div id="lessonMenu" class="space-y-3"></div>
     </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     VIEW 2: 学生输入姓名
-══════════════════════════════════════ -->
-<div id="studentNameView" class="hidden max-w-md mx-auto">
-    <div class="bg-white rounded-3xl shadow-xl p-8 text-center slide-in mt-20">
-        <div class="text-6xl mb-4">🎓</div>
-        <h1 class="text-2xl font-bold text-blue-600 mb-2">小状元识字朗读</h1>
-        <p id="lessonPreview" class="text-gray-500 text-sm mb-6"></p>
-        <input id="studentNameInput" type="text" placeholder="输入你的名字" maxlength="10"
-            class="w-full p-4 border-2 border-blue-200 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-500 mb-4">
-        <button onclick="window.startPractice()"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold text-lg transition-all active:scale-95">
-            开始挑战 <i class="fas fa-arrow-right ml-2"></i>
+<!-- ════════════════════════════════════════
+     界面二：学习主界面
+════════════════════════════════════════ -->
+<div id="screenLearn" class="hidden max-w-5xl mx-auto px-4 py-6">
+
+    <!-- 顶部导航 -->
+    <div class="bg-white rounded-2xl shadow-sm p-4 mb-6 flex items-center justify-between">
+        <button onclick="goHome()" class="text-blue-500 font-bold text-sm flex items-center gap-1 hover:text-blue-700">
+            <i class="fas fa-chevron-left"></i> 返回
+        </button>
+        <div class="text-center">
+            <div id="lessonTitle" class="font-black text-gray-800 text-lg"></div>
+            <div id="studentLabel" class="text-xs text-gray-400"></div>
+        </div>
+        <div class="text-right">
+            <div class="text-xs text-gray-400">总积分</div>
+            <div id="totalScore" class="text-2xl font-black text-orange-500">0</div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="bg-gray-200 rounded-full h-2 mb-6 overflow-hidden">
+        <div id="progressBar" class="bg-blue-500 h-full rounded-full" style="width:0%"></div>
+    </div>
+
+    <!-- 第一关：生词 -->
+    <section class="mb-10">
+        <h2 class="text-lg font-black text-blue-600 mb-4 flex items-center gap-2">
+            <span class="bg-blue-600 text-white text-sm px-3 py-1 rounded-full">第一关</span> 认读生词
+        </h2>
+        <div id="wordGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+    </section>
+
+    <!-- 第二关：朗读 -->
+    <section class="pb-16">
+        <h2 class="text-lg font-black text-red-500 mb-4 flex items-center gap-2">
+            <span class="bg-red-500 text-white text-sm px-3 py-1 rounded-full">第二关</span> 朗读挑战
+        </h2>
+        <div id="paraList" class="space-y-4"></div>
+    </section>
+</div>
+
+<!-- ════════════════════════════════════════
+     奖励弹窗
+════════════════════════════════════════ -->
+<div id="screenReward" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="reward-in bg-white rounded-[2.5rem] p-10 text-center max-w-xs w-full">
+        <div class="text-7xl mb-4">🥇</div>
+        <h2 class="text-3xl font-black text-blue-600 mb-1">太棒了！</h2>
+        <p id="rewardName" class="text-gray-500 mb-6 text-lg"></p>
+        <div class="bg-yellow-100 text-yellow-700 font-bold py-2 px-5 rounded-full inline-block mb-6 text-sm">
+            🏅 获得「识字小状元」勋章
+        </div>
+        <div class="text-4xl font-black text-orange-500 mb-6">
+            总分 <span id="rewardScore">0</span>
+        </div>
+        <button onclick="goHome()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-bold text-lg transition-all">
+            继续学习 <i class="fas fa-arrow-right ml-2"></i>
         </button>
     </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     VIEW 3: 学生练习界面
-══════════════════════════════════════ -->
-<div id="practiceView" class="hidden max-w-5xl mx-auto">
+<script>
+// ════════════════════════════════════════
+//  课程数据（不依赖 API）
+// ════════════════════════════════════════
+const LESSONS = [
+    {
+        unit: "第一单元", title: "一、上学了",
+        content: "上学了，上学了。花儿跟我招招手，太阳跟我一起走，一起走到校门口。",
+        words: [
+            { word:"上学", pinyin:"shàng xué" },
+            { word:"花儿", pinyin:"huā r" },
+            { word:"太阳", pinyin:"tài yáng" },
+            { word:"校门", pinyin:"xiào mén" }
+        ]
+    },
+    {
+        unit: "第一单元", title: "二、早操",
+        content: "小鸟儿，起得早，跳来跳去在树枝上做早操。小朋友，起得早，跑来跑去在草地上做早操。",
+        words: [
+            { word:"小鸟", pinyin:"xiǎo niǎo" },
+            { word:"早操", pinyin:"zǎo cāo" },
+            { word:"树枝", pinyin:"shù zhī" },
+            { word:"草地", pinyin:"cǎo dì" }
+        ]
+    },
+    {
+        unit: "第二单元", title: "一、识字读书长知识",
+        content: "上课了，来识字，识了字儿会读书。读儿歌，读故事，天天学习长知识。",
+        words: [
+            { word:"识字", pinyin:"shí zì" },
+            { word:"读书", pinyin:"dú shū" },
+            { word:"知识", pinyin:"zhī shi" },
+            { word:"儿歌", pinyin:"ér gē" }
+        ]
+    },
+    {
+        unit: "第二单元", title: "二、学写字",
+        content: "小朋友，学写字，一笔一画要写好，眼到手到心也到，笔画笔顺错不了。",
+        words: [
+            { word:"写字", pinyin:"xiě zì" },
+            { word:"笔画", pinyin:"bǐ huà" },
+            { word:"笔顺", pinyin:"bǐ shùn" },
+            { word:"心到", pinyin:"xīn dào" }
+        ]
+    },
+    {
+        unit: "第三单元", title: "一、笑声回来了",
+        content: "门开了，爸爸妈妈笑着回来了。门开了，哥哥姐姐笑着回来了。门开了，全家的笑声回来了。",
+        words: [
+            { word:"笑声", pinyin:"xiào shēng" },
+            { word:"爸爸", pinyin:"bà ba" },
+            { word:"妈妈", pinyin:"mā ma" },
+            { word:"回来", pinyin:"huí lái" }
+        ]
+    },
+    {
+        unit: "第三单元", title: "二、星星",
+        content: "天上星星那么多，这一颗我妈妈，那一颗我爸爸，中间的一颗是我。三颗星星靠得那样近，那样亲，三颗星星那样明。",
+        words: [
+            { word:"星星", pinyin:"xīng xīng" },
+            { word:"天上", pinyin:"tiān shàng" },
+            { word:"中间", pinyin:"zhōng jiān" },
+            { word:"明亮", pinyin:"míng liàng" }
+        ]
+    }
+];
 
-    <!-- Top bar -->
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-blue-600">🌟 小状元识字</h1>
-        <div id="studentBadge" class="bg-white rounded-full px-4 py-2 shadow text-sm font-bold text-gray-700"></div>
-    </div>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbyL8fpYyrFtFnzTMvnZOuAy68rhhwW_y0-1Agq4PdLEhh0Yjqcd07MSuI32qUMDiNR0/exec";
 
-    <!-- Final score banner -->
-    <div id="finalBanner" class="hidden slide-in bg-gradient-to-r from-yellow-400 to-orange-400 rounded-2xl p-6 mb-6 text-white shadow-xl">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-                <div class="bg-white text-orange-500 w-14 h-14 rounded-full flex items-center justify-center text-3xl">🏆</div>
-                <div>
-                    <div class="font-bold text-2xl">恭喜完成！</div>
-                    <div class="opacity-80">你是最棒的小状元！</div>
-                </div>
+// ════════════════════════════════════════
+//  应用状态
+// ════════════════════════════════════════
+let currentLesson = null;
+let currentParas  = [];
+let studentName   = '';
+let itemScores    = {};   // { id: score } 只记最高分
+let totalItems    = 0;
+
+// ════════════════════════════════════════
+//  初始化
+// ════════════════════════════════════════
+window.onload = () => {
+    const saved = localStorage.getItem('studentName');
+    if (saved) document.getElementById('inputName').value = saved;
+
+    const menu = document.getElementById('lessonMenu');
+    LESSONS.forEach((lesson, idx) => {
+        const btn = document.createElement('div');
+        btn.className = 'lesson-card bg-white border-2 border-gray-100 rounded-2xl p-4 flex justify-between items-center shadow-sm';
+        btn.innerHTML = `
+            <div>
+                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">${lesson.unit}</span>
+                <div class="font-bold text-gray-800 mt-1">${lesson.title}</div>
             </div>
-            <div class="text-right">
-                <div class="text-xs uppercase tracking-widest opacity-70 mb-1">最终得分</div>
-                <div class="text-5xl font-bold" id="finalScore">0</div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Stage 1 -->
-    <div id="stage1" class="mb-10">
-        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span class="bg-blue-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">1</span>
-            第一关：生词对对碰
-        </h2>
-        <div id="cardGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
-    </div>
-
-    <!-- Stage 2 (unlocked after stage 1) -->
-    <div id="stage2" class="mb-10 hidden slide-in">
-        <div class="h-0.5 bg-gray-200 my-8 rounded-full"></div>
-        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span class="bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">2</span>
-            第二关：全文朗读挑战
-        </h2>
-        <div id="paragraphContainer" class="space-y-4"></div>
-    </div>
-
-    <!-- Finish button -->
-    <div id="finishBtn" class="hidden flex justify-center py-10">
-        <button onclick="window.finishLesson()"
-            class="bg-green-500 hover:bg-green-600 text-white px-12 py-5 rounded-full text-2xl font-bold shadow-2xl flex items-center gap-4 transition-all hover:scale-105 active:scale-95">
-            <i class="fas fa-trophy"></i> 完成朗读，查看总分！
-        </button>
-    </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     VIEW 4: 数据分析
-══════════════════════════════════════ -->
-<div id="analyticsView" class="hidden max-w-5xl mx-auto">
-    <header class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-blue-600">📊 学生朗读数据分析</h1>
-        <p class="text-gray-500 mt-1" id="analyticsTitle"></p>
-    </header>
-    <div id="analyticsContent">
-        <p class="text-center text-gray-400 py-20">正在加载数据...</p>
-    </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     GLOBAL: Message + Loader
-══════════════════════════════════════ -->
-<div id="messageBox" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 transition-all">
-    <span id="messageContent"></span>
-</div>
-
-<div id="globalLoader" class="hidden fixed inset-0 bg-blue-900/40 backdrop-blur-sm flex items-center justify-center z-50">
-    <div class="bg-white p-8 rounded-3xl shadow-2xl text-center">
-        <div class="relative w-14 h-14 mx-auto mb-4">
-            <div class="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
-            <div class="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-        </div>
-        <div class="font-bold text-gray-800" id="loaderText">小老师准备中...</div>
-    </div>
-</div>
-
-<!-- ══════════════════════════════════════
-     GOOGLE APPS SCRIPT
-══════════════════════════════════════ -->
-<script type="module">
-// ============================================================
-//  ⚙️  CONFIGURATION — 请填入你的密钥
-// ============================================================
-// GAS Web App URL（部署后从 Google Apps Script 复制）
-// 填入你的 GAS Web App URL（部署后从 Google Apps Script 复制）
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyrJ3_tZ42G_f0Q4eN6n7brz0hXI-fAtEESDmuykDz_-3tAwbaVEihZDkxDZEC4FIEYwA/exec";
-// ⚠️ Gemini 和 OpenAI 密钥已移至 GAS Script Properties，前端无需填写
-// ============================================================
-
-// ── GAS 请求封装 ──────────────────────────────────────────────
-async function gasGet(action, params = {}) {
-    const qs  = new URLSearchParams({ action, ...params }).toString();
-    const res = await fetch(`${GAS_URL}?${qs}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'GAS error');
-    return data;
-}
-async function gasPost(body) {
-    const res  = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'GAS error');
-    return data;
-}
-
-// ── 路由状态 ──────────────────────────────────────────────────
-const params   = new URLSearchParams(location.search);
-const lessonId = params.get('lesson');
-const viewMode = params.get('view'); // 'analytics' | null
-
-// ── 练习状态 ──────────────────────────────────────────────────
-let currentLesson   = null;
-let currentAttemptId = null;
-let studentName     = '';
-let paraTextMap     = {};    // paraId -> paragraph text
-let scores          = { words: {}, paragraphs: {} };
-// 朗读评分改用 SpeechRecognition，不需要 MediaRecorder
-
-// ══════════════════════════════════════════════════════════════
-//  ROUTING
-// ══════════════════════════════════════════════════════════════
-async function init() {
-    if (!lessonId) {
-        show('teacherView');
-        await loadTeacherLessons();
-    } else if (viewMode === 'analytics') {
-        show('analyticsView');
-        await loadAnalytics(lessonId);
-    } else {
-        // Student flow
-        setLoading(true, '课程加载中...');
-        currentLesson = await loadLesson(lessonId);
-        setLoading(false);
-        if (!currentLesson) {
-            showMsg('❌ 课程不存在，请确认链接');
-            return;
-        }
-        const preview = currentLesson.inputText?.slice(0, 30) + '...';
-        document.getElementById('lessonPreview').textContent = `课文：${preview}`;
-        show('studentNameView');
-    }
-}
-
-// ══════════════════════════════════════════════════════════════
-//  TEACHER — 创建课程
-// ══════════════════════════════════════════════════════════════
-window.createLesson = async function() {
-    const text = document.getElementById('lessonInput').value.trim();
-    if (!text) { showMsg('请先输入课文内容'); return; }
-
-    // 收集手动填写的生词
-    const entries = document.querySelectorAll('.word-entry');
-    if (!entries.length) { showMsg('请至少添加一个生词'); return; }
-
-    const words = [...entries].map(e => ({
-        word:          e.querySelector('.we-word').value.trim(),
-        pinyin:        e.querySelector('.we-pinyin').value.trim(),
-        explanation:   e.querySelector('.we-exp').value.trim(),
-        bushou:        e.querySelector('.we-bushou').value.trim(),
-        bushouMeaning: e.querySelector('.we-bushouMeaning').value.trim(),
-        peici:         [...e.querySelectorAll('.we-peici')].map(i => i.value.trim()).filter(Boolean),
-        koujue:        e.querySelector('.we-koujue').value.trim(),
-        duoyinzi:      null
-    })).filter(w => w.word && w.pinyin);
-
-    if (!words.length) { showMsg('请填写词语和拼音'); return; }
-
-    // 按换行自动分段
-    const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(Boolean);
-
-    setLoading(true, '储存课程中...');
-    try {
-        await gasPost({ action: 'createLesson', inputText: text, words, paragraphs });
-        document.getElementById('lessonInput').value = '';
-        document.getElementById('wordEntries').innerHTML = '';
-        document.getElementById('wordHint').style.display = '';
-        showMsg('✅ 课程创建成功！');
-        await loadTeacherLessons();
-    } catch(e) {
-        console.error(e);
-        showMsg('创建失败，请检查 GAS 连接');
-    } finally {
-        setLoading(false);
-    }
+            <i class="fas fa-chevron-right text-blue-300"></i>`;
+        btn.onclick = () => startLesson(idx);
+        menu.appendChild(btn);
+    });
 };
 
-// ── 添加生词输入行 ─────────────────────────────────────────────
-window.addWordEntry = function() {
-    document.getElementById('wordHint').style.display = 'none';
-    const container = document.getElementById('wordEntries');
-    const el = document.createElement('div');
-    el.className = 'word-entry bg-gray-50 rounded-2xl p-4 border border-gray-200 slide-in';
-    el.innerHTML = `
-        <div class="grid grid-cols-2 gap-2 mb-2">
-            <input class="we-word w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="词语 * 例：水">
-            <input class="we-pinyin w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="拼音 * 例：shuǐ">
-        </div>
-        <input class="we-exp w-full p-2 rounded-xl border border-gray-200 text-sm mb-2 focus:outline-none focus:border-blue-400" placeholder="解释 * 例：生命之源">
-        <div class="grid grid-cols-2 gap-2 mb-2">
-            <input class="we-bushou w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="部首 例：氵">
-            <input class="we-bushouMeaning w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="部首说明 例：三点水表示水">
-        </div>
-        <div class="grid grid-cols-3 gap-2 mb-2">
-            <input class="we-peici w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="配词1">
-            <input class="we-peici w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="配词2">
-            <input class="we-peici w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="配词3">
-        </div>
-        <input class="we-koujue w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="口诀 例：三点水弯弯流，河里小鱼乐悠悠">
-        <button onclick="this.closest('.word-entry').remove()" class="text-red-400 text-xs mt-2 hover:text-red-600">🗑 删除</button>`;
-    container.appendChild(el);
-    el.querySelector('.we-word').focus();
-};
+// ════════════════════════════════════════
+//  开始课程
+// ════════════════════════════════════════
+function startLesson(idx) {
+    studentName = document.getElementById('inputName').value.trim();
+    if (!studentName) { alert('请先输入名字！'); return; }
+    localStorage.setItem('studentName', studentName);
 
-// ── 老师课程列表 ──────────────────────────────────────────────
-async function loadTeacherLessons() {
-    const container = document.getElementById('teacherLessonList');
-    try {
-        const { lessons } = await gasGet('getLessons');
+    currentLesson = LESSONS[idx];
+    itemScores    = {};
 
-        if (!lessons.length) {
-            container.innerHTML = '<p class="text-gray-400 text-center py-10">还没有课程，创建第一个吧 ↑</p>';
-            return;
-        }
+    // 按句号/感叹号/问号分段
+    currentParas = currentLesson.content
+        .replace(/([。！？])/g, '$1\n').split('\n')
+        .map(s => s.trim()).filter(Boolean);
 
-        container.innerHTML = lessons.map(d => {
-            const shareUrl     = `${location.origin}${location.pathname}?lesson=${d.lessonId}`;
-            const analyticsUrl = `${location.origin}${location.pathname}?lesson=${d.lessonId}&view=analytics`;
-            const date = d.createdAt ? new Date(d.createdAt).toLocaleDateString('zh-CN') : '—';
-            return `
-            <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm card-hover">
-                <div class="flex justify-between items-start mb-2">
-                    <p class="font-bold text-gray-800 line-clamp-2 flex-1 mr-4">${d.inputText?.slice(0, 60)}...</p>
-                    <span class="text-xs text-gray-400 whitespace-nowrap">${date}</span>
-                </div>
-                <div class="flex gap-3 text-xs text-gray-500 mb-4">
-                    <span>📝 生词：${d.wordsPreview || '—'}</span>
-                    <span>|</span>
-                    <span>📖 ${d.paragraphCount || 0} 段</span>
-                    <span>|</span>
-                    <span>👤 ${d.attemptCount || 0} 人参与，${d.completedCount || 0} 人完成</span>
-                </div>
-                <div class="flex gap-2 flex-wrap">
-                    <button onclick="navigator.clipboard.writeText('${shareUrl}').then(()=>window.showMsg('✅ 学生链接已复制！'))"
-                        class="text-xs bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-bold flex items-center gap-1 hover:bg-blue-200 transition-all">
-                        <i class="fas fa-link"></i> 复制学生链接
-                    </button>
-                    <a href="${analyticsUrl}" target="_blank"
-                        class="text-xs bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-bold flex items-center gap-1 hover:bg-emerald-200 transition-all">
-                        <i class="fas fa-chart-bar"></i> 查看数据分析
-                    </a>
-                </div>
-            </div>`;
-        }).join('');
-    } catch(e) {
-        console.error(e);
-        container.innerHTML = '<p class="text-red-400 text-center py-8">加载失败，请检查 GAS 设置</p>';
-    }
+    totalItems = currentLesson.words.length + currentParas.length;
+
+    // 渲染界面
+    document.getElementById('lessonTitle').textContent  = currentLesson.title;
+    document.getElementById('studentLabel').textContent = `状元：${studentName}`;
+    document.getElementById('totalScore').textContent   = '0';
+    updateProgress();
+
+    renderWords(currentLesson.words);
+    renderParas(currentParas);
+
+    show('screenLearn');
 }
 
-// ══════════════════════════════════════════════════════════════
-//  STUDENT — 开始练习
-// ══════════════════════════════════════════════════════════════
-window.startPractice = function() {
-    const name = document.getElementById('studentNameInput').value.trim();
-    if (!name) { showMsg('请输入你的名字！'); return; }
-    studentName = name;
-    scores = { words: {}, paragraphs: {} };
-    currentAttemptId = null;
-
-    show('practiceView');
-    document.getElementById('studentBadge').textContent = `${studentName} 同学，加油！`;
-    renderLesson(currentLesson);
-};
-
-// ── 加载课程 ──────────────────────────────────────────────────
-async function loadLesson(id) {
-    try {
-        const data = await gasGet('getLesson', { lessonId: id });
-        return data;
-    } catch(e) { return null; }
-}
-
-// ══════════════════════════════════════════════════════════════
-//  RENDER
-// ══════════════════════════════════════════════════════════════
-function renderLesson(lesson) {
-    document.getElementById('finalBanner').classList.add('hidden');
-    document.getElementById('stage2').classList.add('hidden');
-    document.getElementById('finishBtn').classList.add('hidden');
-    renderWords(lesson.words);
-    renderParagraphs(lesson.paragraphs);
-}
-
-// ── 每个字的 HanziWriter 实例 ─────────────────────────────────
-const writerInstances = {}; // hid -> [writer, ...]
-
-function charHid(word) {
-    // stable hex ID safe for DOM & JS keys
-    return [...word].map(c => c.codePointAt(0).toString(16)).join('-');
-}
-
+// ════════════════════════════════════════
+//  渲染生词卡
+// ════════════════════════════════════════
 function renderWords(words) {
-    const grid = document.getElementById('cardGrid');
+    const grid = document.getElementById('wordGrid');
     grid.innerHTML = '';
-    words.forEach(item => {
-        const hid   = charHid(item.word);
-        const chars = [...item.word];
-        const hwSize = chars.length === 1 ? 130 : chars.length === 2 ? 100 : 80;
-
-        // 多音字 HTML
-        let duoyinHtml = '';
-        if (Array.isArray(item.duoyinzi) && item.duoyinzi.length > 1) {
-            duoyinHtml = `
-            <div class="bg-orange-50 rounded-2xl p-3">
-                <div class="section-chip text-orange-500 mb-2">🔤 多音多义</div>
-                <div class="space-y-1.5">
-                    ${item.duoyinzi.map(d => `
-                        <div class="flex flex-wrap items-baseline gap-2">
-                            <span class="pinyin text-sm">${d.pinyin}</span>
-                            <span class="text-gray-500 text-xs flex-1">${d.meaning}</span>
-                            <span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-xs font-bold">${d.example}</span>
-                        </div>`).join('')}
-                </div>
-            </div>`;
-        }
-
-        // HanziWriter divs (one per character)
-        const hwDivs = chars.map((_, i) =>
-            `<div id="hw-${hid}-${i}" style="width:${hwSize}px;height:${hwSize}px"></div>`
-        ).join('');
-
+    words.forEach((w, i) => {
+        const id = `word-${i}`;
         const card = document.createElement('div');
-        card.className = 'bg-white rounded-3xl overflow-hidden shadow-md card-hover border border-gray-100 flex flex-col';
+        card.className = 'rounded-3xl overflow-hidden shadow-md flex flex-col';
         card.innerHTML = `
-            <!-- 图片 -->
-            <div id="img-${hid}" class="h-36 bg-gradient-to-br from-sky-50 to-violet-50 flex items-center justify-center text-5xl shrink-0">⏳</div>
-
-            <div class="p-4 flex flex-col gap-3">
-                <!-- 拼音 + 汉字 + 解释 -->
-                <div class="text-center">
-                    <div class="pinyin text-sm">${item.pinyin}</div>
-                    <div class="hanzi-big text-gray-800">${item.word}</div>
-                    <div class="text-gray-400 text-xs mt-0.5">${item.explanation}</div>
-                </div>
-
-                <!-- 部首 + 配词 -->
-                <div class="bg-violet-50 rounded-2xl p-3">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="section-chip text-violet-500">🏠 部首</span>
-                        <span class="bg-violet-100 text-violet-700 px-3 py-0.5 rounded-full text-sm font-bold">${item.bushou ?? '—'}</span>
-                        <span class="text-violet-400 text-xs">${item.bushouMeaning ?? ''}</span>
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">
-                        ${(item.peici ?? []).map(p =>
-                            `<span class="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-xs font-bold">${p}</span>`
-                        ).join('')}
-                    </div>
-                </div>
-
-                <!-- 记字口诀 -->
-                <div class="bg-amber-50 rounded-2xl p-3">
-                    <div class="section-chip text-amber-500 mb-1">💡 记字口诀</div>
-                    <div class="text-amber-800 text-sm font-medium leading-relaxed">${item.koujue ?? '—'}</div>
-                </div>
-
-                <!-- 多音多义 (conditional) -->
-                ${duoyinHtml}
-
-                <!-- 笔顺 + 描红 -->
-                <div class="hw-box">
-                    <div class="section-chip text-gray-500 mb-2">✏️ 笔顺 · 描红</div>
-                    <!-- 模式切换 -->
-                    <div class="flex gap-2 w-full mb-3">
-                        <button id="btn-stroke-${hid}" onclick="window.playStroke('${hid}')"
-                            class="tab-btn active">▶ 看笔顺</button>
-                        <button id="btn-trace-${hid}" onclick="window.startTrace('${hid}')"
-                            class="tab-btn">✏️ 描红练习</button>
-                    </div>
-                    <!-- HanziWriter canvas 区域 -->
-                    <div class="hw-writers">${hwDivs}</div>
-                    <!-- 描红结果 -->
-                    <div id="trace-result-${hid}" class="mt-2 text-center text-xs hidden"></div>
-                </div>
-
-                <!-- 朗读录音 -->
-                <div id="eval-word-${hid}" class="hidden p-3 bg-yellow-50 rounded-2xl text-sm"></div>
+            <!-- 彩色字卡区 -->
+            <div class="grad-${i % 6} h-28 flex items-center justify-center">
+                <span class="hanzi text-6xl text-white drop-shadow">${w.word}</span>
+            </div>
+            <!-- 信息区 -->
+            <div class="bg-white flex-1 p-4 text-center">
+                <div class="text-red-500 font-bold text-sm mb-1">${w.pinyin}</div>
+                <!-- 实时识别反馈 -->
+                <div id="match-${id}" class="text-xs min-h-[1.5rem] text-gray-400 mb-2"></div>
+                <!-- 得分 -->
+                <div id="score-${id}" class="text-xs font-bold text-blue-500 min-h-[1.2rem] mb-3"></div>
+                <!-- 按钮 -->
                 <div class="flex justify-center gap-3">
-                    <button data-text="${item.word}" onclick="window.speakText(this.dataset.text)"
-                        title="听读音"
-                        class="w-11 h-11 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-200 transition-all">
+                    <button onclick="speak('${w.word}')"
+                        class="w-11 h-11 rounded-full bg-blue-50 text-blue-500 hover:bg-blue-100 transition-all flex items-center justify-center">
                         <i class="fas fa-volume-up"></i>
                     </button>
-                    <button id="rec-word-${hid}" data-id="${hid}" data-type="word" data-word="${item.word}"
-                        onclick="window.toggleRecord(this)"
-                        class="w-11 h-11 rounded-full bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-200 transition-all">
+                    <button id="btn-${id}" onclick="startRead('${w.word}','${id}')"
+                        class="w-11 h-11 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition-all flex items-center justify-center">
                         <i class="fas fa-microphone"></i>
                     </button>
                 </div>
             </div>`;
-
         grid.appendChild(card);
-        generateImage(hid, item.imagePrompt);
-        // 等 DOM 稳定后再初始化 HanziWriter
-        setTimeout(() => initWriters(hid, item.word), 80);
     });
 }
 
-// ── HanziWriter：初始化 ───────────────────────────────────────
-function initWriters(hid, word) {
-    const chars = [...word];
-    const size  = chars.length === 1 ? 130 : chars.length === 2 ? 100 : 80;
-    writerInstances[hid] = [];
-    chars.forEach((ch, i) => {
-        const el = document.getElementById(`hw-${hid}-${i}`);
-        if (!el) return;
-        try {
-            const w = HanziWriter.create(`hw-${hid}-${i}`, ch, {
-                width: size, height: size, padding: 8,
-                showOutline: true,
-                strokeColor: '#1d4ed8',
-                outlineColor: '#bfdbfe',
-                drawingColor: '#dc2626',
-                drawingWidth: size > 100 ? 10 : 8,
-                strokeAnimationSpeed: 1,
-                delayBetweenStrokes: 350,
-                highlightColor: '#fbbf24'
-            });
-            writerInstances[hid].push(w);
-        } catch(e) {
-            el.innerHTML = `<div class="text-gray-300 text-xs text-center pt-4">${ch}<br>暂缺</div>`;
-        }
-    });
-}
-
-// ── 播放笔顺动画 ──────────────────────────────────────────────
-window.playStroke = function(hid) {
-    setTabActive(hid, 'stroke');
-    document.getElementById(`trace-result-${hid}`)?.classList.add('hidden');
-    const writers = writerInstances[hid];
-    if (!writers?.length) return;
-    // 逐字依序播放
-    let chain = Promise.resolve();
-    writers.forEach(w => {
-        chain = chain.then(() => new Promise(res => w.animateCharacter({ onComplete: res })));
-    });
-};
-
-// ── 开始描红练习 ──────────────────────────────────────────────
-window.startTrace = function(hid) {
-    setTabActive(hid, 'trace');
-    const resultEl = document.getElementById(`trace-result-${hid}`);
-    resultEl.classList.remove('hidden');
-    resultEl.innerHTML = '<span class="text-gray-400 animate-pulse">请按笔顺描红每一笔…</span>';
-
-    const writers = writerInstances[hid];
-    if (!writers?.length) return;
-
-    let totalMistakes = 0;
-    let completed     = 0;
-
-    writers.forEach(w => {
-        w.quiz({
-            leniency: 0.8,
-            showHintAfterMisses: 3,
-            onMistake: () => { totalMistakes++; },
-            onComplete: (summary) => {
-                totalMistakes += (summary.totalMistakes ?? 0);
-                completed++;
-                if (completed === writers.length) {
-                    const stars = totalMistakes === 0 ? 5
-                                : totalMistakes <= 2  ? 4
-                                : totalMistakes <= 5  ? 3
-                                : totalMistakes <= 9  ? 2 : 1;
-                    const msg   = totalMistakes === 0 ? '完美！一笔不差！🎉'
-                                : totalMistakes <= 3  ? '写得很好！继续加油！'
-                                : '完成了！多练几次会更棒！';
-                    resultEl.innerHTML = `
-                        <div class="text-yellow-400 text-xl mb-1">
-                            ${'⭐'.repeat(stars)}${'<span class="text-gray-200">☆</span>'.repeat(5 - stars)}
-                        </div>
-                        <div class="text-green-600 font-bold">${msg}</div>`;
-                }
-            }
-        });
-    });
-};
-
-function setTabActive(hid, mode) {
-    const sb = document.getElementById(`btn-stroke-${hid}`);
-    const tb = document.getElementById(`btn-trace-${hid}`);
-    if (!sb || !tb) return;
-    sb.classList.toggle('active', mode === 'stroke');
-    tb.classList.toggle('active', mode === 'trace');
-}
-
-function renderParagraphs(paragraphs) {
-    const container = document.getElementById('paragraphContainer');
-    container.innerHTML = '';
-    paragraphs.forEach((p, idx) => {
-        const pId = `para-${idx}`;
-        paraTextMap[pId] = p;
-
-        const box = document.createElement('div');
-        box.className = 'bg-white rounded-2xl p-6 border-2 border-blue-50 shadow-sm';
-        box.innerHTML = `
-            <p class="text-xl text-gray-700 leading-relaxed mb-5 select-none">${p}</p>
-            <div class="flex items-center justify-between border-t border-gray-100 pt-4">
-                <div id="eval-${pId}" class="flex flex-col gap-1 text-sm"></div>
-                <div class="flex gap-3">
-                    <button data-id="${pId}" onclick="window.speakParaById(this.dataset.id)"
-                        class="flex items-center gap-2 text-blue-600 bg-blue-50 px-5 py-2 rounded-full text-sm font-bold hover:bg-blue-100 transition-all">
-                        <i class="fas fa-play"></i> 听
-                    </button>
-                    <button id="rec-btn-${pId}" data-id="${pId}" data-type="para"
-                        onclick="window.toggleRecord(this)"
-                        class="flex items-center gap-2 text-red-600 bg-red-50 px-5 py-2 rounded-full text-sm font-bold hover:bg-red-100 transition-all">
-                        <i class="fas fa-microphone"></i> 读
-                    </button>
-                </div>
+// ════════════════════════════════════════
+//  渲染段落
+// ════════════════════════════════════════
+function renderParas(paras) {
+    const list = document.getElementById('paraList');
+    list.innerHTML = '';
+    paras.forEach((p, i) => {
+        const id   = `para-${i}`;
+        const safe = p.replace(/'/g, "\\'");
+        const row  = document.createElement('div');
+        row.className = 'bg-white rounded-2xl shadow-sm p-5 border-l-4 border-blue-400';
+        row.innerHTML = `
+            <p class="text-xl text-gray-700 leading-relaxed mb-3">${p}</p>
+            <!-- 实时字符匹配 -->
+            <div id="match-${id}" class="text-sm font-bold mb-2 min-h-[1.5rem] tracking-wider"></div>
+            <!-- 识别文字 -->
+            <div id="heard-${id}" class="text-xs text-gray-400 mb-3 min-h-[1rem]"></div>
+            <!-- 得分 -->
+            <div id="score-${id}" class="text-sm font-bold min-h-[1.5rem] mb-3"></div>
+            <!-- 按钮 -->
+            <div class="flex gap-3">
+                <button onclick="speak('${safe}')"
+                    class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-2.5 rounded-full font-bold text-sm transition-all flex items-center gap-2">
+                    <i class="fas fa-volume-up"></i> 听读
+                </button>
+                <button id="btn-${id}" onclick="startRead('${safe}','${id}')"
+                    class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-full font-bold text-sm transition-all flex items-center gap-2">
+                    <i class="fas fa-microphone"></i> 朗读
+                </button>
             </div>`;
-        container.appendChild(box);
+        list.appendChild(row);
     });
 }
 
-window.speakParaById = function(id) { window.speakText(paraTextMap[id]); };
+// ════════════════════════════════════════
+//  TTS — Web Speech API
+// ════════════════════════════════════════
+function speak(text) {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang  = 'zh-CN';
+    u.rate  = 0.85;
+    u.pitch = 1;
+    speechSynthesis.speak(u);
+}
 
-// ══════════════════════════════════════════════════════════════
-//  朗读 — 使用浏览器 SpeechRecognition（无需 API）
-// ══════════════════════════════════════════════════════════════
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+// ════════════════════════════════════════
+//  朗读 + 实时评分 — SpeechRecognition
+// ════════════════════════════════════════
+function startRead(target, id) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('请使用 Chrome 或 Edge 浏览器'); return; }
 
-window.toggleRecord = function(btn) {
-    if (!SR) { showMsg('请使用 Chrome 或 Edge 浏览器'); return; }
+    const btn     = document.getElementById(`btn-${id}`);
+    const matchEl = document.getElementById(`match-${id}`);
+    const heardEl = document.getElementById(`heard-${id}`);
+    const scoreEl = document.getElementById(`score-${id}`);
 
-    const type     = btn.dataset.type;
-    const id       = btn.dataset.id;
-    const word     = btn.dataset.word ?? '';
-    const target   = type === 'word' ? word : paraTextMap[id];
-    const scoreKey = type === 'word' ? word : id;
-    const divId    = type === 'word' ? `eval-word-${id}` : `eval-${id}`;
+    const recog          = new SR();
+    recog.lang           = 'zh-CN';
+    recog.continuous     = false;
+    recog.interimResults = true;   // ← 实时返回
+    recog.maxAlternatives = 1;
 
-    const evalEl = document.getElementById(divId);
-    if (evalEl) {
-        evalEl.classList.remove('hidden');
-        evalEl.innerHTML = '<span class="text-xs text-gray-400 animate-pulse">🎤 请朗读…</span>';
-    }
+    let lastSpoken = '';
 
+    // ── 录音中 UI ────────────────────────
     const origHtml = btn.innerHTML;
-    btn.classList.add('pulse-ring', '!bg-red-500', '!text-white');
-    btn.innerHTML = type === 'word' ? '<i class="fas fa-circle-notch fa-spin"></i>' : '<i class="fas fa-circle-notch fa-spin"></i> 听中…';
-    showMsg('🎤 正在聆听，请朗读…');
+    btn.innerHTML  = '<i class="fas fa-circle-notch fa-spin"></i>';
+    btn.classList.add('rec-pulse', '!bg-red-600');
+    if (matchEl) matchEl.innerHTML = '🎤 请朗读…';
+    if (heardEl) heardEl.textContent = '';
+    if (scoreEl) scoreEl.textContent = '';
 
-    const recognition   = new SR();
-    recognition.lang    = 'zh-CN';
-    recognition.continuous      = false;
-    recognition.interimResults  = false;
-    recognition.maxAlternatives = 1;
+    // ── 实时结果 ─────────────────────────
+    recog.onresult = (e) => {
+        let interim = '', final = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            (e.results[i].isFinal ? (final += e.results[i][0].transcript)
+                                  : (interim += e.results[i][0].transcript));
+        }
+        lastSpoken = final || interim;
 
-    recognition.onresult = (e) => {
-        const spoken = e.results[0][0].transcript;
-        btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
-        btn.innerHTML = origHtml;
-        scoreReading(type, id, scoreKey, spoken, target);
+        // 实时字符匹配高亮
+        if (matchEl) matchEl.innerHTML = renderMatchChars(target, lastSpoken);
+        if (heardEl) heardEl.textContent = lastSpoken ? `识别：「${lastSpoken}」` : '';
     };
 
-    recognition.onerror = () => {
-        btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
+    // ── 识别结束 → 计算最终得分 ──────────
+    recog.onend = () => {
         btn.innerHTML = origHtml;
-        if (evalEl) evalEl.innerHTML = '<span class="text-red-400 text-xs">未能识别，请再试一次 😊</span>';
+        btn.classList.remove('rec-pulse', '!bg-red-600');
+
+        if (!lastSpoken) {
+            if (matchEl) matchEl.innerHTML = '<span class="text-gray-400 text-xs">未能识别，请再试一次</span>';
+            return;
+        }
+
+        const score = calcScore(target, lastSpoken);
+        showScore(id, target, lastSpoken, score);
+        updateTotal(id, score);
+        checkDone();
+        uploadGAS(target, lastSpoken, score);
     };
 
-    recognition.onend = () => {
-        btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
+    recog.onerror = (e) => {
         btn.innerHTML = origHtml;
+        btn.classList.remove('rec-pulse', '!bg-red-600');
+        if (e.error !== 'no-speech') {
+            if (matchEl) matchEl.innerHTML = '<span class="text-red-400 text-xs">识别出错，请重试</span>';
+        }
     };
 
-    recognition.start();
-};
+    recog.start();
+}
 
-// ── 评分：比对识别文字与目标文字 ─────────────────────────────
-function scoreReading(type, id, scoreKey, spoken, target) {
-    const divId  = type === 'word' ? `eval-word-${id}` : `eval-${id}`;
-    const evalEl = document.getElementById(divId);
+// ── 字符匹配高亮 ──────────────────────────────────────────────
+function renderMatchChars(target, spoken) {
+    const spoken_set = new Set([...spoken.replace(/[^一-鿿]/g, '')]);
+    return [...target].map(c => {
+        if (!/[一-鿿]/.test(c)) return `<span class="char-punc">${c}</span>`;
+        return spoken_set.has(c)
+            ? `<span class="char-hit">${c}</span>`
+            : `<span class="char-miss">${c}</span>`;
+    }).join('');
+}
 
-    // 只比对中文字符
+// ── 显示最终得分 ──────────────────────────────────────────────
+function showScore(id, target, spoken, score) {
+    const matchEl = document.getElementById(`match-${id}`);
+    const scoreEl = document.getElementById(`score-${id}`);
+    if (matchEl) matchEl.innerHTML = renderMatchChars(target, spoken);
+    if (!scoreEl) return;
+
+    const stars = score >= 90 ? 5 : score >= 75 ? 4 : score >= 55 ? 3 : score >= 30 ? 2 : 1;
+    const color = score >= 75 ? 'text-green-600' : score >= 50 ? 'text-yellow-600' : 'text-red-500';
+    const msgs  = { 5:'完美！字字清晰！🌟', 4:'读得很好！👍', 3:'不错！多练几次！😊', 2:'继续加油！💪', 1:'再来一次！🌈' };
+    scoreEl.innerHTML = `<span class="${color}">${'⭐'.repeat(stars)}${'☆'.repeat(5-stars)} ${score}分</span> <span class="text-gray-400 text-xs">${msgs[stars]}</span>`;
+}
+
+// ── 得分计算 ──────────────────────────────────────────────────
+function calcScore(target, spoken) {
     const tChars = [...target.replace(/[^一-鿿]/g, '')];
     const sSet   = new Set([...spoken.replace(/[^一-鿿]/g, '')]);
-    const hit    = tChars.filter(c => sSet.has(c)).length;
-    const ratio  = tChars.length ? hit / tChars.length : 0;
-
-    const stars = ratio >= 0.95 ? 5 : ratio >= 0.75 ? 4 : ratio >= 0.55 ? 3 : ratio >= 0.3 ? 2 : 1;
-    const feedbacks = {
-        5: '太棒了！字字清晰！🌟',
-        4: '读得很好！继续加油！👍',
-        3: '不错！多练几次会更准！😊',
-        2: '继续努力，你可以的！💪',
-        1: '再试一次，相信你！🌈'
-    };
-
-    if (evalEl) {
-        evalEl.classList.remove('hidden');
-        evalEl.innerHTML = `
-            <div class="text-lg leading-none mb-1">
-                ${Array(stars).fill('<span class="star-filled">⭐</span>').join('')}${Array(5-stars).fill('<span class="star-empty">☆</span>').join('')}
-            </div>
-            <div class="text-blue-600 font-bold text-xs">${feedbacks[stars]}</div>
-            <div class="text-gray-400 text-xs mt-0.5">识别：「${spoken}」</div>`;
-    }
-
-    if (type === 'word') scores.words[scoreKey] = stars;
-    else                  scores.paragraphs[scoreKey] = stars;
-
-    saveProgress().catch(console.error);
-    checkCompletion();
+    if (!tChars.length) return 0;
+    const hits = tChars.filter(c => sSet.has(c)).length;
+    return Math.round(hits / tChars.length * 100);
 }
 
-// ══════════════════════════════════════════════════════════════
-//  GAS: 保存进度
-// ══════════════════════════════════════════════════════════════
-async function saveProgress() {
-    const payload = {
-        action:      'saveAttempt',
-        attemptId:   currentAttemptId,
-        lessonId,
-        studentName,
-        wordScores:  scores.words,
-        paraScores:  scores.paragraphs,
-        totalScore:  calcTotal()
-    };
-    const res = await gasPost(payload);
-    if (!currentAttemptId) currentAttemptId = res.attemptId;
-}
-
-function calcTotal() {
-    const w = Object.values(scores.words).reduce((a, b) => a + b, 0) * 10;
-    const p = Object.values(scores.paragraphs).reduce((a, b) => a + b, 0) * 20;
-    return w + p;
-}
-
-// ══════════════════════════════════════════════════════════════
-//  COMPLETION CHECK
-// ══════════════════════════════════════════════════════════════
-function checkCompletion() {
-    const totalWords = currentLesson.words.length;
-    const wordsDone  = Object.keys(scores.words).length;
-
-    if (wordsDone >= totalWords) {
-        const s2 = document.getElementById('stage2');
-        if (s2.classList.contains('hidden')) {
-            s2.classList.remove('hidden');
-            showMsg('🎉 第一关通过！开启全文朗读！');
-            s2.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }
-
-    const totalParas = currentLesson.paragraphs.length;
-    const parasDone  = Object.keys(scores.paragraphs).length;
-
-    if (parasDone >= totalParas) {
-        document.getElementById('finishBtn').classList.remove('hidden');
+// ── 更新总分（只计最高）────────────────────────────────────────
+function updateTotal(id, score) {
+    const prev = itemScores[id] ?? -1;
+    if (score > prev) {
+        itemScores[id] = score;
+        const total = Object.values(itemScores).reduce((a, b) => a + b, 0);
+        document.getElementById('totalScore').textContent = total;
+        updateProgress();
     }
 }
 
-// ══════════════════════════════════════════════════════════════
-//  FINISH
-// ══════════════════════════════════════════════════════════════
-window.finishLesson = async function() {
-    const total = calcTotal();
-    if (currentAttemptId) {
-        await gasPost({
-            action: 'saveAttempt', attemptId: currentAttemptId,
-            lessonId, studentName,
-            wordScores: scores.words, paraScores: scores.paragraphs,
-            totalScore: total, completedAt: new Date().toISOString()
-        });
-    }
-    document.getElementById('finalScore').textContent = total;
-    document.getElementById('finalBanner').classList.remove('hidden');
-    document.getElementById('finishBtn').classList.add('hidden');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showMsg('🏆 状元及第！太厉害了！');
-};
+// ── 进度条 ────────────────────────────────────────────────────
+function updateProgress() {
+    const done = Object.keys(itemScores).length;
+    const pct  = totalItems ? Math.round(done / totalItems * 100) : 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+}
 
-// ══════════════════════════════════════════════════════════════
-//  ANALYTICS
-// ══════════════════════════════════════════════════════════════
-async function loadAnalytics(id) {
-    try {
-        const { lesson, attempts } = await gasGet('getAnalytics', { lessonId: id });
-        document.getElementById('analyticsTitle').textContent = lesson.inputText?.slice(0, 40) + '…';
-        renderAnalytics(lesson, attempts);
-    } catch(e) {
-        console.error(e);
-        document.getElementById('analyticsContent').innerHTML = '<p class="text-red-400 text-center">加载失败</p>';
+// ── 完成检查 → 奖励弹窗 ──────────────────────────────────────
+function checkDone() {
+    if (Object.keys(itemScores).length < totalItems) return;
+    const total = Object.values(itemScores).reduce((a, b) => a + b, 0);
+    document.getElementById('rewardName').textContent = `${studentName} 成功完成挑战！`;
+    document.getElementById('rewardScore').textContent = total;
+    setTimeout(() => {
+        show('screenReward');
+        spawnConfetti();
+    }, 800);
+}
+
+// ── 彩屑 ─────────────────────────────────────────────────────
+function spawnConfetti() {
+    const colors = ['#f2d74e','#95c3de','#ff9a91','#96db8d','#c890e4'];
+    for (let i = 0; i < 60; i++) {
+        const el = document.createElement('div');
+        el.className = 'confetti';
+        el.style.cssText = `left:${Math.random()*100}vw;top:-20px;background:${colors[i%colors.length]};animation-delay:${Math.random()*1.5}s;animation-duration:${2+Math.random()*1.5}s`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 4000);
     }
 }
 
-function renderAnalytics(lesson, attempts) {
-    const el        = document.getElementById('analyticsContent');
-    const completed = attempts.filter(a => a.completedAt);
-    const avgScore  = completed.length
-        ? Math.round(completed.reduce((s, a) => s + (a.totalScore || 0), 0) / completed.length)
-        : 0;
-
-    // 生词平均星
-    const wordAvg = {};
-    lesson.words.forEach(w => {
-        const vals = attempts.map(a => a.wordScores?.[w.word]).filter(v => v != null);
-        wordAvg[w.word] = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
-    });
-
-    // 段落平均星
-    const paraAvg = {};
-    lesson.paragraphs.forEach((_, idx) => {
-        const key  = `para-${idx}`;
-        const vals = attempts.map(a => a.paraScores?.[key]).filter(v => v != null);
-        paraAvg[idx] = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
-    });
-
-    el.innerHTML = `
-    <!-- 汇总 -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        ${[
-            ['👥 参与人数', attempts.length, 'blue'],
-            ['✅ 完成人数', completed.length, 'green'],
-            ['📊 平均得分', avgScore, 'yellow'],
-            ['🏆 最高得分', completed.length ? Math.max(...completed.map(a=>a.totalScore||0)) : '—', 'red']
-        ].map(([label, val, c]) => `
-            <div class="bg-${c}-50 border border-${c}-100 rounded-2xl p-5 text-center">
-                <div class="text-3xl font-bold text-${c}-600 mb-1">${val}</div>
-                <div class="text-gray-500 text-sm">${label}</div>
-            </div>`).join('')}
-    </div>
-
-    <!-- 生词掌握 -->
-    <h3 class="font-bold text-lg text-gray-800 mb-4">📝 生词掌握情况</h3>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-        ${lesson.words.map(w => {
-            const avg = wordAvg[w.word];
-            const stars = avg != null ? Math.round(avg) : 0;
-            const pct   = avg != null ? Math.round(avg / 5 * 100) : 0;
-            const color = pct >= 80 ? 'green' : pct >= 60 ? 'yellow' : 'red';
-            return `
-            <div class="bg-white rounded-2xl p-4 text-center border border-gray-100 shadow-sm">
-                <div class="hanzi-big text-gray-800 text-3xl">${w.word}</div>
-                <div class="text-gray-400 text-xs mb-2">${w.pinyin}</div>
-                <div class="flex justify-center gap-0.5 mb-2">
-                    ${Array(5).fill(0).map((_, i) => `<span class="${i < stars ? 'star-filled' : 'star-empty'}">★</span>`).join('')}
-                </div>
-                <div class="text-xs font-bold text-${color}-600">${avg != null ? avg.toFixed(1) + ' / 5' : '暂无数据'}</div>
-            </div>`;
-        }).join('')}
-    </div>
-
-    <!-- 段落朗读 -->
-    <h3 class="font-bold text-lg text-gray-800 mb-4">📖 段落朗读情况</h3>
-    <div class="space-y-3 mb-10">
-        ${lesson.paragraphs.map((p, idx) => {
-            const avg   = paraAvg[idx];
-            const pct   = avg != null ? Math.round(avg / 5 * 100) : 0;
-            const color = pct >= 80 ? 'green' : pct >= 60 ? 'yellow' : 'red';
-            const bar   = avg != null ? pct : 0;
-            return `
-            <div class="bg-white rounded-2xl p-4 border border-gray-100">
-                <p class="text-gray-700 text-sm mb-3 line-clamp-2">${p}</p>
-                <div class="flex items-center gap-3">
-                    <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-                        <div class="h-full bg-${color}-400 rounded-full transition-all" style="width:${bar}%"></div>
-                    </div>
-                    <span class="text-xs font-bold text-${color}-600 w-16 text-right">
-                        ${avg != null ? avg.toFixed(1) + ' / 5' : '暂无'}
-                    </span>
-                </div>
-            </div>`;
-        }).join('')}
-    </div>
-
-    <!-- 得分图表 -->
-    ${completed.length >= 2 ? `
-    <h3 class="font-bold text-lg text-gray-800 mb-4">📈 得分分布</h3>
-    <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm mb-10">
-        <canvas id="scoreChart" height="120"></canvas>
-    </div>` : ''}
-
-    <!-- 学生成绩单 -->
-    <h3 class="font-bold text-lg text-gray-800 mb-4">🎓 学生成绩单</h3>
-    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto mb-10">
-        <table class="w-full text-sm">
-            <thead class="bg-gray-50 border-b">
-                <tr class="text-left">
-                    <th class="p-4">姓名</th>
-                    <th class="p-4 text-center">总分</th>
-                    <th class="p-4 text-center">完成</th>
-                    ${lesson.words.map(w => `<th class="p-4 text-center">${w.word}</th>`).join('')}
-                    ${lesson.paragraphs.map((_, i) => `<th class="p-4 text-center">段${i+1}</th>`).join('')}
-                    <th class="p-4 text-gray-400 text-xs">时间</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${attempts.length === 0
-                    ? `<tr><td colspan="20" class="p-8 text-center text-gray-400">还没有学生参与</td></tr>`
-                    : attempts.map(a => {
-                        const done = !!a.completedAt;
-                        const ts   = a.startedAt?.toDate?.()?.toLocaleString('zh-CN', { hour12: false }) || '—';
-                        return `
-                        <tr class="border-t hover:bg-gray-50 transition-colors">
-                            <td class="p-4 font-bold text-gray-800">${a.studentName}</td>
-                            <td class="p-4 text-center font-bold ${done ? 'text-blue-600' : 'text-gray-400'}">${a.totalScore ?? '—'}</td>
-                            <td class="p-4 text-center">${done ? '✅' : '🔄'}</td>
-                            ${lesson.words.map(w => {
-                                const s = a.wordScores?.[w.word];
-                                return `<td class="p-4 text-center">${s != null ? '⭐'.repeat(s) : '—'}</td>`;
-                            }).join('')}
-                            ${lesson.paragraphs.map((_, i) => {
-                                const s = a.paraScores?.[`para-${i}`];
-                                return `<td class="p-4 text-center">${s != null ? '⭐'.repeat(s) : '—'}</td>`;
-                            }).join('')}
-                            <td class="p-4 text-xs text-gray-400">${ts}</td>
-                        </tr>`;
-                    }).join('')}
-            </tbody>
-        </table>
-    </div>`;
-
-    // Chart.js 柱状图
-    if (completed.length >= 2) {
-        const ctx = document.getElementById('scoreChart');
-        if (ctx) {
-            new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: completed.map(a => a.studentName),
-                    datasets: [{
-                        label: '总分',
-                        data: completed.map(a => a.totalScore || 0),
-                        backgroundColor: 'rgba(59,130,246,0.5)',
-                        borderColor: 'rgb(59,130,246)',
-                        borderWidth: 2,
-                        borderRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 10 } } }
-                }
-            });
-        }
-    }
+// ── GAS 上传 ──────────────────────────────────────────────────
+function uploadGAS(target, spoken, score) {
+    fetch(GAS_URL, {
+        method: 'POST',
+        mode:   'no-cors',
+        body:   JSON.stringify({
+            name:    studentName,
+            lesson:  currentLesson?.title,
+            content: target,
+            spoken,
+            score,
+            time:    new Date().toLocaleString('zh-CN')
+        })
+    }).catch(() => {}); // 静默失败
 }
 
-// ══════════════════════════════════════════════════════════════
-//  无 API 方案：浏览器内建功能
-// ══════════════════════════════════════════════════════════════
-
-// ── 字卡图区：彩色背景 + 大字显示 ───────────────────────────
-const CARD_GRADIENTS = [
-    '#667eea,#764ba2', '#f093fb,#f5576c', '#4facfe,#00f2fe',
-    '#43e97b,#38f9d7', '#fa709a,#fee140', '#a18cd1,#fbc2eb',
-    '#ffecd2,#fcb69f', '#84fab0,#8fd3f4'
-];
-function generateImage(hid, _prompt) {
-    const el = document.getElementById(`img-${hid}`);
-    if (!el) return;
-    const idx  = parseInt(hid.slice(0, 2), 16) % CARD_GRADIENTS.length;
-    const grad = CARD_GRADIENTS[idx];
-    el.style.background = `linear-gradient(135deg,${grad})`;
-    el.innerHTML = ''; // 汉字已在卡片正文显示，图区留空做色块
-}
-
-// ── TTS：浏览器内建 SpeechSynthesis ──────────────────────────
-window.speakText = function(text) {
-    if (!text) return;
-    speechSynthesis.cancel();
-    const u  = new SpeechSynthesisUtterance(text);
-    u.lang   = 'zh-CN';
-    u.rate   = 0.85;
-    u.pitch  = 1;
-    speechSynthesis.speak(u);
-};
-
-
-// ── Utilities ─────────────────────────────────────────────────
+// ── 屏幕切换 ─────────────────────────────────────────────────
 function show(id) {
-    ['teacherView', 'studentNameView', 'practiceView', 'analyticsView']
-        .forEach(v => document.getElementById(v)?.classList.add('hidden'));
-    document.getElementById(id)?.classList.remove('hidden');
+    ['screenStart','screenLearn','screenReward'].forEach(s => {
+        document.getElementById(s).classList.toggle('hidden', s !== id);
+    });
 }
 
-window.showMsg = function(text) {
-    const box = document.getElementById('messageBox');
-    document.getElementById('messageContent').textContent = text;
-    box.classList.remove('hidden');
-    clearTimeout(box._timer);
-    box._timer = setTimeout(() => box.classList.add('hidden'), 3000);
-};
-
-function setLoading(on, text = '小老师准备中...') {
-    document.getElementById('loaderText').textContent = text;
-    document.getElementById('globalLoader').classList.toggle('hidden', !on);
+function goHome() {
+    speechSynthesis.cancel();
+    show('screenStart');
+    currentLesson = null;
+    itemScores    = {};
 }
-
-// ── START ──────────────────────────────────────────────────────
-init().catch(console.error);
 </script>
 </body>
 </html>
