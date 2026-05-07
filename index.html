@@ -130,64 +130,67 @@
 //  课程数据（不依赖 API）
 // ════════════════════════════════════════
 const LESSONS = [
+    // ── 第一单元：新的开始 ──────────────────────────────────────
     {
-        unit: "第一单元", title: "一、上学了",
+        unit: "第一单元·新的开始", title: "一、上学了",
         content: "上学了，上学了。花儿跟我招招手，太阳跟我一起走，一起走到校门口。",
         words: [
             { word:"上学", pinyin:"shàng xué" },
-            { word:"花儿", pinyin:"huā r" },
-            { word:"太阳", pinyin:"tài yáng" },
-            { word:"校门", pinyin:"xiào mén" }
+            { word:"花儿", pinyin:"huā r"      },
+            { word:"太阳", pinyin:"tài yáng"   },
+            { word:"校门", pinyin:"xiào mén"   }
         ]
     },
     {
-        unit: "第一单元", title: "二、早操",
+        unit: "第一单元·新的开始", title: "二、早操",
         content: "小鸟儿，起得早，跳来跳去在树枝上做早操。小朋友，起得早，跑来跑去在草地上做早操。",
         words: [
             { word:"小鸟", pinyin:"xiǎo niǎo" },
-            { word:"早操", pinyin:"zǎo cāo" },
-            { word:"树枝", pinyin:"shù zhī" },
-            { word:"草地", pinyin:"cǎo dì" }
+            { word:"早操", pinyin:"zǎo cāo"   },
+            { word:"树枝", pinyin:"shù zhī"   },
+            { word:"草地", pinyin:"cǎo dì"    }
         ]
     },
+    // ── 第二单元：走进教室 ──────────────────────────────────────
     {
-        unit: "第二单元", title: "一、识字读书长知识",
+        unit: "第二单元·走进教室", title: "一、识字读书长知识",
         content: "上课了，来识字，识了字儿会读书。读儿歌，读故事，天天学习长知识。",
         words: [
-            { word:"识字", pinyin:"shí zì" },
-            { word:"读书", pinyin:"dú shū" },
+            { word:"识字", pinyin:"shí zì"  },
+            { word:"读书", pinyin:"dú shū"  },
             { word:"知识", pinyin:"zhī shi" },
-            { word:"儿歌", pinyin:"ér gē" }
+            { word:"儿歌", pinyin:"ér gē"   }
         ]
     },
     {
-        unit: "第二单元", title: "二、学写字",
+        unit: "第二单元·走进教室", title: "二、学写字",
         content: "小朋友，学写字，一笔一画要写好，眼到手到心也到，笔画笔顺错不了。",
         words: [
-            { word:"写字", pinyin:"xiě zì" },
-            { word:"笔画", pinyin:"bǐ huà" },
+            { word:"写字", pinyin:"xiě zì"  },
+            { word:"笔画", pinyin:"bǐ huà"  },
             { word:"笔顺", pinyin:"bǐ shùn" },
-            { word:"心到", pinyin:"xīn dào" }
+            { word:"眼到", pinyin:"yǎn dào" }
         ]
     },
+    // ── 第三单元：我爱我的家 ────────────────────────────────────
     {
-        unit: "第三单元", title: "一、笑声回来了",
+        unit: "第三单元·我爱我的家", title: "一、笑声回来了",
         content: "门开了，爸爸妈妈笑着回来了。门开了，哥哥姐姐笑着回来了。门开了，全家的笑声回来了。",
         words: [
             { word:"笑声", pinyin:"xiào shēng" },
-            { word:"爸爸", pinyin:"bà ba" },
-            { word:"妈妈", pinyin:"mā ma" },
-            { word:"回来", pinyin:"huí lái" }
+            { word:"爸爸", pinyin:"bà ba"       },
+            { word:"妈妈", pinyin:"mā ma"       },
+            { word:"回来", pinyin:"huí lái"     }
         ]
     },
     {
-        unit: "第三单元", title: "二、星星",
+        unit: "第三单元·我爱我的家", title: "二、星星",
         content: "天上星星那么多，这一颗我妈妈，那一颗我爸爸，中间的一颗是我。三颗星星靠得那样近，那样亲，三颗星星那样明。",
         words: [
-            { word:"星星", pinyin:"xīng xīng" },
+            { word:"星星", pinyin:"xīng xīng"  },
             { word:"天上", pinyin:"tiān shàng" },
             { word:"中间", pinyin:"zhōng jiān" },
-            { word:"明亮", pinyin:"míng liàng" }
+            { word:"三颗", pinyin:"sān kē"     }
         ]
     }
 ];
@@ -210,15 +213,26 @@ window.onload = () => {
     const saved = localStorage.getItem('studentName');
     if (saved) document.getElementById('inputName').value = saved;
 
-    const menu = document.getElementById('lessonMenu');
+    const menu   = document.getElementById('lessonMenu');
+    const UNIT_COLORS = ['blue','purple','green'];
+    let   lastUnit = '', unitIdx = -1;
+
     LESSONS.forEach((lesson, idx) => {
+        // 单元标题（换单元时显示）
+        if (lesson.unit !== lastUnit) {
+            lastUnit = lesson.unit;
+            unitIdx++;
+            const c = UNIT_COLORS[unitIdx % UNIT_COLORS.length];
+            const hdr = document.createElement('div');
+            hdr.className = `text-xs font-black text-${c}-600 bg-${c}-50 border border-${c}-100 rounded-xl px-3 py-2 mt-3 mb-1`;
+            hdr.textContent = lesson.unit;
+            menu.appendChild(hdr);
+        }
+        // 课程按钮
         const btn = document.createElement('div');
         btn.className = 'lesson-card bg-white border-2 border-gray-100 rounded-2xl p-4 flex justify-between items-center shadow-sm';
         btn.innerHTML = `
-            <div>
-                <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">${lesson.unit}</span>
-                <div class="font-bold text-gray-800 mt-1">${lesson.title}</div>
-            </div>
+            <div class="font-bold text-gray-800">${lesson.title}</div>
             <i class="fas fa-chevron-right text-blue-300"></i>`;
         btn.onclick = () => startLesson(idx);
         menu.appendChild(btn);
