@@ -108,8 +108,17 @@ function setupInitialLessonsWeb() {
     return { message: '初始化完成' };
 }
 
-function geminiKey() {
-    return PropertiesService.getScriptProperties().getProperty('GEMINI_KEY');
+function openAIKey() {
+    return PropertiesService.getScriptProperties().getProperty('OPENAI_KEY');
+}
+
+// 根据词语构建卡通风格 prompt
+function buildImagePrompt(word) {
+    return 'A cute kawaii cartoon illustration for Chinese primary school children aged 6-7. ' +
+           'The image clearly and simply represents the Chinese word "' + word + '". ' +
+           'Art style: flat design, pastel soft colors, bold clean outlines, pure white background, ' +
+           'friendly cheerful expression, simple composition. ' +
+           'No text, no letters, no Chinese characters in the image.';
 }
 
 // ── Spreadsheet ───────────────────────────────────────────────
@@ -252,24 +261,28 @@ function generateOneImage(d) {
 }
 
 function callImagenAndSave(lessonId, wordObj) {
-    const key    = geminiKey();
-    if (!key) throw new Error('请在 Script Properties 中设置 GEMINI_KEY');
+    const key = openAIKey();
+    if (!key) throw new Error('请在 Script Properties 中设置 OPENAI_KEY');
 
-    const prompt = 'Cute simple cartoon illustration for Chinese primary school children, colorful, white background, child-friendly flat design: '
-                 + (wordObj.imgPrompt || wordObj.word);
+    const prompt = buildImagePrompt(wordObj.word);
 
-    const res  = UrlFetchApp.fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=' + key,
-        {
-            method:      'post',
-            contentType: 'application/json',
-            payload:     JSON.stringify({ instances: [{ prompt }], parameters: { sampleCount: 1 } }),
-            muteHttpExceptions: true
-        }
-    );
+    const res = UrlFetchApp.fetch('https://api.openai.com/v1/images/generations', {
+        method:      'post',
+        contentType: 'application/json',
+        headers:     { 'Authorization': 'Bearer ' + key },
+        payload:     JSON.stringify({
+            model:           'dall-e-3',
+            prompt:          prompt,
+            n:               1,
+            size:            '1024x1024',
+            response_format: 'b64_json'
+        }),
+        muteHttpExceptions: true
+    });
+
     const data = JSON.parse(res.getContentText());
-    const b64  = data.predictions?.[0]?.bytesBase64Encoded;
-    if (!b64) throw new Error('Imagen 未返回图片：' + res.getContentText().slice(0, 200));
+    const b64  = data.data?.[0]?.b64_json;
+    if (!b64) throw new Error('DALL-E 未返回图片：' + res.getContentText().slice(0, 300));
 
     return saveToDrive(b64, lessonId + '_' + wordObj.word + '.png');
 }

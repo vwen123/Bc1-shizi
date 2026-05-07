@@ -6,6 +6,7 @@
     <title>小状元 · 老师控制台</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro/dist/index.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; background:#f1f5f9; }
@@ -58,6 +59,13 @@
     </header>
 
     <div class="max-w-6xl mx-auto px-4 py-8">
+
+        <!-- OpenAI Key 提示（图片生成需要） -->
+        <div class="bg-blue-50 border border-blue-100 rounded-2xl p-3 mb-4 text-xs text-blue-700">
+            <i class="fas fa-info-circle mr-1"></i>
+            <strong>生成图片需要：</strong>在 GAS 专案设定 → Script Properties 中加入
+            <code class="bg-blue-100 px-1 rounded">OPENAI_KEY</code> = 你的 OpenAI key，图片风格已设为卡通可爱。
+        </div>
 
         <!-- 初始化提示 -->
         <div id="setupBanner" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center justify-between hidden">
@@ -395,35 +403,75 @@ function toggleForm() {
     if (!isOpen && !document.getElementById('wordRows').children.length) addWordRow();
 }
 
+// ── 自动拼音 ──────────────────────────────────────────────────
+function autoPinyin(wordInput, pinyinInput) {
+    const word = wordInput.value.trim();
+    if (!word) return;
+    try {
+        // pinyin-pro UMD 全局对象
+        const py = (window.pinyinPro?.pinyin || window.pinyin);
+        if (py) {
+            pinyinInput.value = py(word, { toneType: 'symbol', separator: ' ' });
+        }
+    } catch(e) { /* 库未加载时静默跳过 */ }
+}
+
 function addWordRow(w) {
     const container = document.getElementById('wordRows');
     const row = document.createElement('div');
-    row.className = 'flex gap-2 items-center';
+    row.className = 'flex gap-2 items-center bg-slate-50 rounded-2xl p-3 border border-slate-100';
+
+    const wordId  = 'word-'  + Date.now() + Math.random().toString(36).slice(2);
+    const pyId    = 'py-'    + Date.now() + Math.random().toString(36).slice(2);
+
     row.innerHTML = `
-        <input placeholder="词语 *" value="${w?.word||''}"
-            class="w-20 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400 font-bold">
-        <input placeholder="拼音 *" value="${w?.pinyin||''}"
-            class="w-24 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400">
-        <input placeholder="Emoji" value="${w?.emoji||''}"
-            class="w-16 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400 text-center">
-        <input placeholder="图片提示（英文，可不填）" value="${w?.imgPrompt||''}"
-            class="flex-1 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400">
-        <button onclick="this.closest('div').remove()" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-100 flex items-center justify-center text-xs shrink-0">
+        <div class="flex flex-col gap-1 flex-1">
+            <div class="flex gap-2">
+                <div class="flex-1">
+                    <label class="text-[10px] font-black text-slate-400 mb-0.5 block">词语 *</label>
+                    <input id="${wordId}" placeholder="花儿" value="${w?.word||''}"
+                        class="w-full p-2.5 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 font-bold text-center"
+                        oninput="autoPinyin(this, document.getElementById('${pyId}'))">
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center justify-between mb-0.5">
+                        <label class="text-[10px] font-black text-slate-400">拼音（自动）</label>
+                        <button type="button" onclick="autoPinyin(document.getElementById('${wordId}'), document.getElementById('${pyId}'))"
+                            class="text-[9px] text-blue-500 hover:text-blue-700 font-bold">刷新</button>
+                    </div>
+                    <input id="${pyId}" placeholder="huā r" value="${w?.pinyin||''}"
+                        class="w-full p-2.5 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 text-red-500 font-bold">
+                </div>
+                <div class="w-16">
+                    <label class="text-[10px] font-black text-slate-400 mb-0.5 block">Emoji</label>
+                    <input placeholder="🌸" value="${w?.emoji||''}"
+                        class="w-full p-2.5 border-2 border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 text-center">
+                </div>
+            </div>
+        </div>
+        <button onclick="this.closest('div.flex').remove()"
+            class="w-9 h-9 rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-100 flex items-center justify-center text-sm shrink-0 self-center mt-4">
             <i class="fas fa-times"></i>
         </button>`;
     container.appendChild(row);
+
+    // 如果有词语但没有拼音，自动生成
+    if (w?.word && !w?.pinyin) {
+        const wInput = row.querySelector(`#${wordId}`);
+        const pInput = row.querySelector(`#${pyId}`);
+        setTimeout(() => autoPinyin(wInput, pInput), 100);
+    }
 }
 
 function getFormWords() {
-    const rows = document.getElementById('wordRows').querySelectorAll('div');
+    const rows = document.querySelectorAll('#wordRows > div.flex');
     return [...rows].map(row => {
         const inputs = row.querySelectorAll('input');
         return {
-            word:      inputs[0]?.value.trim() || '',
-            pinyin:    inputs[1]?.value.trim() || '',
-            emoji:     inputs[2]?.value.trim() || '📚',
-            imgPrompt: inputs[3]?.value.trim() || '',
-            imgUrl:    ''
+            word:    inputs[0]?.value.trim() || '',
+            pinyin:  inputs[1]?.value.trim() || '',
+            emoji:   inputs[2]?.value.trim() || '📚',
+            imgUrl:  ''
         };
     }).filter(w => w.word);
 }
