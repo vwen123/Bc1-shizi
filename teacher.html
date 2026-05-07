@@ -59,6 +59,20 @@
 
     <div class="max-w-6xl mx-auto px-4 py-8">
 
+        <!-- 初始化提示 -->
+        <div id="setupBanner" class="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center justify-between hidden">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🚀</span>
+                <div>
+                    <div class="font-black text-amber-800 text-sm">首次使用：一键载入预设课程</div>
+                    <div class="text-amber-600 text-xs">6 课 · 24 个生词 · 图片已就绪</div>
+                </div>
+            </div>
+            <button onclick="setupLessons()" class="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-black text-sm transition-all flex items-center gap-2">
+                <i class="fas fa-magic"></i> 立即初始化
+            </button>
+        </div>
+
         <!-- 标签栏 -->
         <div class="flex gap-2 mb-8 bg-white rounded-2xl p-1.5 shadow-sm w-fit">
             <button class="tab-btn active px-6 py-2.5 rounded-xl font-bold text-sm transition-all" onclick="switchTab('lessons', this)">
@@ -210,6 +224,26 @@ async function init() {
     await loadLessons();
 }
 
+async function setupLessons() {
+    const btn = document.querySelector('#setupBanner button');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 初始化中...';
+    btn.disabled = true;
+    try {
+        const res = await gasPost({ action: 'setupInitialLessons' });
+        if (res.ok !== false) {
+            toast('✅ 课程初始化成功！');
+            document.getElementById('setupBanner').classList.add('hidden');
+            await loadLessons();
+        } else {
+            toast(res.error || '初始化失败', true);
+        }
+    } catch(e) {
+        toast('失败：' + e.message, true);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 // ── 标签切换 ──────────────────────────────────────────────────
 function switchTab(tab, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-500'); });
@@ -236,9 +270,11 @@ async function loadLessons() {
 function renderLessons() {
     const container = document.getElementById('lessonList');
     if (!allLessons.length) {
-        container.innerHTML = '<div class="text-center text-slate-300 py-16"><i class="fas fa-book-open text-4xl mb-3 block"></i>还没有课程，点上方「新建课程」开始</div>';
+        document.getElementById('setupBanner').classList.remove('hidden');
+        container.innerHTML = '<div class="text-center text-slate-300 py-10"><i class="fas fa-book-open text-4xl mb-3 block"></i>还没有课程</div>';
         return;
     }
+    document.getElementById('setupBanner').classList.add('hidden');
     container.innerHTML = allLessons.map(l => `
     <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <!-- 课程标题行 -->
