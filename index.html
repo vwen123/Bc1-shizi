@@ -54,12 +54,27 @@
         <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <i class="fas fa-plus-circle text-blue-500"></i> 创建新课程
         </h2>
-        <textarea id="lessonInput" rows="4" placeholder="在此粘贴课文内容..."
-            class="w-full p-4 border-2 border-blue-100 rounded-2xl focus:outline-none focus:border-blue-400 text-base mb-4 resize-none"></textarea>
+
+        <!-- 课文 -->
+        <label class="text-sm font-bold text-gray-600 mb-1 block">📖 课文内容（按 Enter 分段）</label>
+        <textarea id="lessonInput" rows="4" placeholder="在此粘贴课文内容，每行为一段..."
+            class="w-full p-4 border-2 border-blue-100 rounded-2xl focus:outline-none focus:border-blue-400 text-base mb-5 resize-none"></textarea>
+
+        <!-- 生词 -->
+        <div class="flex items-center justify-between mb-3">
+            <label class="text-sm font-bold text-gray-600">📝 生词列表</label>
+            <button onclick="window.addWordEntry()"
+                class="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-full font-bold hover:bg-blue-200 transition-all flex items-center gap-1">
+                <i class="fas fa-plus"></i> 添加生词
+            </button>
+        </div>
+        <div id="wordEntries" class="space-y-3 mb-5"></div>
+        <p id="wordHint" class="text-gray-400 text-xs text-center py-3">点击「添加生词」开始填写</p>
+
         <div class="flex justify-end">
             <button onclick="window.createLesson()"
                 class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition-all active:scale-95">
-                <i class="fas fa-magic"></i> 生成课程
+                <i class="fas fa-save"></i> 储存课程
             </button>
         </div>
     </div>
@@ -215,7 +230,7 @@ let currentAttemptId = null;
 let studentName     = '';
 let paraTextMap     = {};    // paraId -> paragraph text
 let scores          = { words: {}, paragraphs: {} };
-let mediaRecorder, audioChunks = [], isRecording = false;
+// 朗读评分改用 SpeechRecognition，不需要 MediaRecorder
 
 // ══════════════════════════════════════════════════════════════
 //  ROUTING
@@ -249,21 +264,67 @@ window.createLesson = async function() {
     const text = document.getElementById('lessonInput').value.trim();
     if (!text) { showMsg('请先输入课文内容'); return; }
 
-    setLoading(true, '小老师分析课文中...');
+    // 收集手动填写的生词
+    const entries = document.querySelectorAll('.word-entry');
+    if (!entries.length) { showMsg('请至少添加一个生词'); return; }
+
+    const words = [...entries].map(e => ({
+        word:          e.querySelector('.we-word').value.trim(),
+        pinyin:        e.querySelector('.we-pinyin').value.trim(),
+        explanation:   e.querySelector('.we-exp').value.trim(),
+        bushou:        e.querySelector('.we-bushou').value.trim(),
+        bushouMeaning: e.querySelector('.we-bushouMeaning').value.trim(),
+        peici:         [...e.querySelectorAll('.we-peici')].map(i => i.value.trim()).filter(Boolean),
+        koujue:        e.querySelector('.we-koujue').value.trim(),
+        duoyinzi:      null
+    })).filter(w => w.word && w.pinyin);
+
+    if (!words.length) { showMsg('请填写词语和拼音'); return; }
+
+    // 按换行自动分段
+    const paragraphs = text.split(/\n+/).map(p => p.trim()).filter(Boolean);
+
+    setLoading(true, '储存课程中...');
     try {
-        const data = await processWithGemini(text);
-
-        await gasPost({ action: 'createLesson', inputText: text, words: data.words, paragraphs: data.paragraphs });
-
+        await gasPost({ action: 'createLesson', inputText: text, words, paragraphs });
         document.getElementById('lessonInput').value = '';
+        document.getElementById('wordEntries').innerHTML = '';
+        document.getElementById('wordHint').style.display = '';
         showMsg('✅ 课程创建成功！');
         await loadTeacherLessons();
     } catch(e) {
         console.error(e);
-        showMsg('创建失败，请检查 API 密钥');
+        showMsg('创建失败，请检查 GAS 连接');
     } finally {
         setLoading(false);
     }
+};
+
+// ── 添加生词输入行 ─────────────────────────────────────────────
+window.addWordEntry = function() {
+    document.getElementById('wordHint').style.display = 'none';
+    const container = document.getElementById('wordEntries');
+    const el = document.createElement('div');
+    el.className = 'word-entry bg-gray-50 rounded-2xl p-4 border border-gray-200 slide-in';
+    el.innerHTML = `
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <input class="we-word w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="词语 * 例：水">
+            <input class="we-pinyin w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="拼音 * 例：shuǐ">
+        </div>
+        <input class="we-exp w-full p-2 rounded-xl border border-gray-200 text-sm mb-2 focus:outline-none focus:border-blue-400" placeholder="解释 * 例：生命之源">
+        <div class="grid grid-cols-2 gap-2 mb-2">
+            <input class="we-bushou w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="部首 例：氵">
+            <input class="we-bushouMeaning w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="部首说明 例：三点水表示水">
+        </div>
+        <div class="grid grid-cols-3 gap-2 mb-2">
+            <input class="we-peici w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="配词1">
+            <input class="we-peici w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="配词2">
+            <input class="we-peici w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="配词3">
+        </div>
+        <input class="we-koujue w-full p-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400" placeholder="口诀 例：三点水弯弯流，河里小鱼乐悠悠">
+        <button onclick="this.closest('.word-entry').remove()" class="text-red-400 text-xs mt-2 hover:text-red-600">🗑 删除</button>`;
+    container.appendChild(el);
+    el.querySelector('.we-word').focus();
 };
 
 // ── 老师课程列表 ──────────────────────────────────────────────
@@ -580,85 +641,93 @@ function renderParagraphs(paragraphs) {
 window.speakParaById = function(id) { window.speakText(paraTextMap[id]); };
 
 // ══════════════════════════════════════════════════════════════
-//  RECORDING
+//  朗读 — 使用浏览器 SpeechRecognition（无需 API）
 // ══════════════════════════════════════════════════════════════
-window.toggleRecord = async function(btn) {
-    if (isRecording) {
-        if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
-        return;
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+window.toggleRecord = function(btn) {
+    if (!SR) { showMsg('请使用 Chrome 或 Edge 浏览器'); return; }
+
+    const type     = btn.dataset.type;
+    const id       = btn.dataset.id;
+    const word     = btn.dataset.word ?? '';
+    const target   = type === 'word' ? word : paraTextMap[id];
+    const scoreKey = type === 'word' ? word : id;
+    const divId    = type === 'word' ? `eval-word-${id}` : `eval-${id}`;
+
+    const evalEl = document.getElementById(divId);
+    if (evalEl) {
+        evalEl.classList.remove('hidden');
+        evalEl.innerHTML = '<span class="text-xs text-gray-400 animate-pulse">🎤 请朗读…</span>';
     }
-    try {
-        const stream  = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mime    = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-        mediaRecorder = new MediaRecorder(stream, { mimeType: mime });
-        audioChunks   = [];
-        isRecording   = true;
 
-        const origHtml = btn.innerHTML;
-        btn.classList.add('pulse-ring', '!bg-red-500', '!text-white');
-        btn.innerHTML = btn.dataset.type === 'word'
-            ? '<i class="fas fa-stop"></i>'
-            : '<i class="fas fa-stop"></i> 停止';
+    const origHtml = btn.innerHTML;
+    btn.classList.add('pulse-ring', '!bg-red-500', '!text-white');
+    btn.innerHTML = type === 'word' ? '<i class="fas fa-circle-notch fa-spin"></i>' : '<i class="fas fa-circle-notch fa-spin"></i> 听中…';
+    showMsg('🎤 正在聆听，请朗读…');
 
-        showMsg('🔴 录音中…点击停止');
+    const recognition   = new SR();
+    recognition.lang    = 'zh-CN';
+    recognition.continuous      = false;
+    recognition.interimResults  = false;
+    recognition.maxAlternatives = 1;
 
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = () => {
-            isRecording = false;
-            stream.getTracks().forEach(t => t.stop());
-            btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
-            btn.innerHTML = origHtml;
+    recognition.onresult = (e) => {
+        const spoken = e.results[0][0].transcript;
+        btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
+        btn.innerHTML = origHtml;
+        scoreReading(type, id, scoreKey, spoken, target);
+    };
 
-            const blob   = new Blob(audioChunks, { type: mime });
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = () => {
-                const b64      = reader.result.split(',')[1];
-                const type     = btn.dataset.type;
-                const id       = btn.dataset.id;               // hid (word) | paraId (para)
-                const word     = btn.dataset.word ?? '';       // actual hanzi for words
-                const target   = type === 'word' ? word : paraTextMap[id];
-                const scoreKey = type === 'word' ? word : id; // analytics expects hanzi as key
-                evaluate(type, id, scoreKey, b64, target, mime);
-            };
-        };
-        mediaRecorder.start();
-    } catch(e) {
-        showMsg('❌ 无法使用麦克风，请检查权限');
-    }
+    recognition.onerror = () => {
+        btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
+        btn.innerHTML = origHtml;
+        if (evalEl) evalEl.innerHTML = '<span class="text-red-400 text-xs">未能识别，请再试一次 😊</span>';
+    };
+
+    recognition.onend = () => {
+        btn.classList.remove('pulse-ring', '!bg-red-500', '!text-white');
+        btn.innerHTML = origHtml;
+    };
+
+    recognition.start();
 };
 
-// ══════════════════════════════════════════════════════════════
-//  EVALUATE
-// ══════════════════════════════════════════════════════════════
-async function evaluate(type, id, scoreKey, b64, target, mime) {
-    // id       = DOM id (hid for words, paraId for paras)
-    // scoreKey = key stored in scores object (hanzi for words, paraId for paras)
+// ── 评分：比对识别文字与目标文字 ─────────────────────────────
+function scoreReading(type, id, scoreKey, spoken, target) {
     const divId  = type === 'word' ? `eval-word-${id}` : `eval-${id}`;
     const evalEl = document.getElementById(divId);
-    if (!evalEl) return;
-    evalEl.classList.remove('hidden');
-    evalEl.innerHTML = '<span class="text-xs text-gray-400 animate-pulse">小老师打分中…</span>';
 
-    try {
-        const data  = await gasPost({ action: 'evaluateReading', target, b64, mime });
-        const stars = Math.max(1, Math.min(5, Math.round(data.stars)));
+    // 只比对中文字符
+    const tChars = [...target.replace(/[^一-鿿]/g, '')];
+    const sSet   = new Set([...spoken.replace(/[^一-鿿]/g, '')]);
+    const hit    = tChars.filter(c => sSet.has(c)).length;
+    const ratio  = tChars.length ? hit / tChars.length : 0;
 
+    const stars = ratio >= 0.95 ? 5 : ratio >= 0.75 ? 4 : ratio >= 0.55 ? 3 : ratio >= 0.3 ? 2 : 1;
+    const feedbacks = {
+        5: '太棒了！字字清晰！🌟',
+        4: '读得很好！继续加油！👍',
+        3: '不错！多练几次会更准！😊',
+        2: '继续努力，你可以的！💪',
+        1: '再试一次，相信你！🌈'
+    };
+
+    if (evalEl) {
+        evalEl.classList.remove('hidden');
         evalEl.innerHTML = `
-            <div class="text-lg leading-none">
+            <div class="text-lg leading-none mb-1">
                 ${Array(stars).fill('<span class="star-filled">⭐</span>').join('')}${Array(5-stars).fill('<span class="star-empty">☆</span>').join('')}
             </div>
-            <div class="text-blue-600 font-bold text-xs mt-1">${data.feedback}</div>`;
-
-        if (type === 'word') scores.words[scoreKey] = stars;
-        else                  scores.paragraphs[scoreKey] = stars;
-
-        await saveProgress();
-        checkCompletion();
-    } catch(e) {
-        console.error(e);
-        evalEl.innerHTML = '<span class="text-red-400 text-xs">评分出错，请再录一次 😊</span>';
+            <div class="text-blue-600 font-bold text-xs">${feedbacks[stars]}</div>
+            <div class="text-gray-400 text-xs mt-0.5">识别：「${spoken}」</div>`;
     }
+
+    if (type === 'word') scores.words[scoreKey] = stars;
+    else                  scores.paragraphs[scoreKey] = stars;
+
+    saveProgress().catch(console.error);
+    checkCompletion();
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -897,54 +966,35 @@ function renderAnalytics(lesson, attempts) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  AI 调用（全部走 GAS 代理，密钥在 GAS Script Properties）
+//  无 API 方案：浏览器内建功能
 // ══════════════════════════════════════════════════════════════
-async function processWithGemini(text) {
-    const data = await gasPost({ action: 'processLesson', text });
-    return data; // { words, paragraphs }
-}
 
-// ── 图片生成 ─────────────────────────────────────────────────
-async function generateImage(hid, prompt) {
+// ── 字卡图区：彩色背景 + 大字显示 ───────────────────────────
+const CARD_GRADIENTS = [
+    '#667eea,#764ba2', '#f093fb,#f5576c', '#4facfe,#00f2fe',
+    '#43e97b,#38f9d7', '#fa709a,#fee140', '#a18cd1,#fbc2eb',
+    '#ffecd2,#fcb69f', '#84fab0,#8fd3f4'
+];
+function generateImage(hid, _prompt) {
     const el = document.getElementById(`img-${hid}`);
     if (!el) return;
-    try {
-        const data = await gasPost({ action: 'generateImage', prompt });
-        if (data.b64) {
-            el.innerHTML = `<img src="data:image/png;base64,${data.b64}" class="w-full h-full object-cover">`;
-            return;
-        }
-    } catch(e) { /* fallback */ }
-    el.textContent = '🖼️';
+    const idx  = parseInt(hid.slice(0, 2), 16) % CARD_GRADIENTS.length;
+    const grad = CARD_GRADIENTS[idx];
+    el.style.background = `linear-gradient(135deg,${grad})`;
+    el.innerHTML = ''; // 汉字已在卡片正文显示，图区留空做色块
 }
 
-// ── TTS ──────────────────────────────────────────────────────
-window.speakText = async function(text) {
+// ── TTS：浏览器内建 SpeechSynthesis ──────────────────────────
+window.speakText = function(text) {
     if (!text) return;
-    try {
-        const data = await gasPost({ action: 'tts', text });
-        if (data.audioData) playPCM(data.audioData, 24000);
-    } catch(e) { showMsg('语音播放失败'); }
+    speechSynthesis.cancel();
+    const u  = new SpeechSynthesisUtterance(text);
+    u.lang   = 'zh-CN';
+    u.rate   = 0.85;
+    u.pitch  = 1;
+    speechSynthesis.speak(u);
 };
 
-function playPCM(b64, rate) {
-    const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
-    const hdr = createWavHeader(buf.byteLength, rate);
-    const url = URL.createObjectURL(new Blob([hdr, buf], { type: 'audio/wav' }));
-    const audio = new Audio(url);
-    audio.onended = () => URL.revokeObjectURL(url);
-    audio.play();
-}
-
-function createWavHeader(len, rate) {
-    const h = new ArrayBuffer(44), v = new DataView(h);
-    v.setUint32(0, 0x46464952, true); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x45564157, true);
-    v.setUint32(12, 0x20746d66, true); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
-    v.setUint16(22, 1, true); v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true);
-    v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x61746164, true);
-    v.setUint32(40, len, true);
-    return h;
-}
 
 // ── Utilities ─────────────────────────────────────────────────
 function show(id) {
