@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小状元 · 老师控制台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; background:#f1f5f9; }
+        .tab-btn.active { background:#3b82f6; color:#fff; }
+        .status-draft     { background:#fef3c7; color:#d97706; }
+        .status-published { background:#d1fae5; color:#059669; }
+        .img-cell { width:56px; height:56px; object-fit:cover; border-radius:0.75rem; }
+        .img-placeholder { width:56px; height:56px; border-radius:0.75rem; display:flex; align-items:center; justify-content:center; font-size:1.5rem; }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<!-- PIN 验证页 -->
+<div id="pinScreen" class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm text-center">
+        <div class="text-5xl mb-4">🔐</div>
+        <h1 class="text-2xl font-black text-slate-800 mb-1">老师控制台</h1>
+        <p class="text-slate-400 text-sm mb-8">请输入教师密码</p>
+        <input id="pinInput" type="password" placeholder="密码" maxlength="8"
+            class="w-full text-center text-2xl p-4 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-400 mb-4 tracking-widest">
+        <button onclick="checkPin()"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black text-lg transition-all">
+            进入
+        </button>
+        <p class="text-xs text-slate-300 mt-4">默认密码：8888（可在代码中修改）</p>
+    </div>
+</div>
+
+<!-- 主控制台 -->
+<div id="dashboard" class="hidden">
+
+    <!-- 顶部栏 -->
+    <header class="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl">🌟</span>
+            <div>
+                <h1 class="font-black text-slate-800 leading-tight">小状元识字</h1>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest">老师控制台</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <a id="studentLink" href="index.html" target="_blank"
+                class="text-xs bg-blue-50 text-blue-600 px-4 py-2 rounded-full font-bold hover:bg-blue-100 transition-all flex items-center gap-1">
+                <i class="fas fa-external-link-alt"></i> 学生页面
+            </a>
+            <button onclick="logout()" class="text-xs text-slate-400 hover:text-slate-600">退出</button>
+        </div>
+    </header>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+
+        <!-- 标签栏 -->
+        <div class="flex gap-2 mb-8 bg-white rounded-2xl p-1.5 shadow-sm w-fit">
+            <button class="tab-btn active px-6 py-2.5 rounded-xl font-bold text-sm transition-all" onclick="switchTab('lessons', this)">
+                <i class="fas fa-book mr-2"></i>课程管理
+            </button>
+            <button class="tab-btn px-6 py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-all" onclick="switchTab('analytics', this)">
+                <i class="fas fa-chart-bar mr-2"></i>学生数据
+            </button>
+        </div>
+
+        <!-- ══ 课程管理 ══ -->
+        <div id="tab-lessons">
+
+            <!-- 新建课程 -->
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 mb-6">
+                <button onclick="toggleForm()" class="w-full px-8 py-5 flex items-center justify-between text-left">
+                    <div class="flex items-center gap-3 font-black text-slate-800">
+                        <div class="w-9 h-9 bg-blue-600 text-white rounded-xl flex items-center justify-center">
+                            <i class="fas fa-plus text-sm"></i>
+                        </div>
+                        新建课程
+                    </div>
+                    <i id="formChevron" class="fas fa-chevron-down text-slate-400 transition-transform"></i>
+                </button>
+
+                <div id="lessonForm" class="hidden px-8 pb-8 border-t border-slate-50">
+                    <input type="hidden" id="editingId">
+                    <div class="grid grid-cols-2 gap-4 mt-6 mb-4">
+                        <div>
+                            <label class="text-xs font-black text-slate-500 mb-1 block">单元名称</label>
+                            <input id="f-unit" placeholder="第一单元·新的开始"
+                                class="w-full p-3 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs font-black text-slate-500 mb-1 block">课题标题</label>
+                            <input id="f-title" placeholder="一、上学了"
+                                class="w-full p-3 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 text-sm">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="text-xs font-black text-slate-500 mb-1 block">课文内容（每句一行或自然分段）</label>
+                        <textarea id="f-content" rows="4" placeholder="上学了，上学了。花儿跟我招招手..."
+                            class="w-full p-3 border-2 border-slate-100 rounded-xl focus:outline-none focus:border-blue-400 text-sm resize-none"></textarea>
+                    </div>
+
+                    <!-- 生词列表 -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-black text-slate-500">生词列表</label>
+                            <button onclick="addWordRow()"
+                                class="text-xs bg-blue-50 text-blue-600 px-3 py-1 rounded-full font-bold hover:bg-blue-100">
+                                <i class="fas fa-plus mr-1"></i>添加
+                            </button>
+                        </div>
+                        <div id="wordRows" class="space-y-2"></div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button onclick="saveLesson()"
+                            class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-black transition-all">
+                            <i class="fas fa-save mr-2"></i>保存课程
+                        </button>
+                        <button onclick="cancelForm()"
+                            class="px-6 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200 transition-all">
+                            取消
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 课程列表 -->
+            <div id="lessonList" class="space-y-4">
+                <div class="text-center text-slate-400 py-10">加载中...</div>
+            </div>
+        </div>
+
+        <!-- ══ 学生数据 ══ -->
+        <div id="tab-analytics" class="hidden">
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6">
+                <div class="flex items-center gap-3 mb-4">
+                    <label class="text-sm font-bold text-slate-600">选择课程：</label>
+                    <select id="analyticsLessonSelect" onchange="loadAnalytics()"
+                        class="flex-1 p-2.5 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400">
+                        <option value="">— 请选择 —</option>
+                    </select>
+                </div>
+            </div>
+            <div id="analyticsContent">
+                <div class="text-center text-slate-400 py-16">请选择课程查看数据</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="hidden fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-2xl shadow-2xl z-[200] text-sm font-bold"></div>
+
+<script>
+// ── 配置 ──────────────────────────────────────────────────────
+const GAS_URL = "FILL_IN_GAS_URL";
+const TEACHER_PIN = "8888"; // 修改此处更改密码
+
+// ── PIN 验证 ──────────────────────────────────────────────────
+function checkPin() {
+    const val = document.getElementById('pinInput').value;
+    if (val === TEACHER_PIN || localStorage.getItem('teacher_auth') === TEACHER_PIN) {
+        localStorage.setItem('teacher_auth', TEACHER_PIN);
+        document.getElementById('pinScreen').classList.add('hidden');
+        document.getElementById('dashboard').classList.remove('hidden');
+        init();
+    } else {
+        toast('密码错误，请重试');
+        document.getElementById('pinInput').value = '';
+    }
+}
+
+document.getElementById('pinInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') checkPin();
+});
+
+// 自动登录（已验证过）
+if (localStorage.getItem('teacher_auth') === TEACHER_PIN) {
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    window.addEventListener('load', init);
+}
+
+function logout() {
+    localStorage.removeItem('teacher_auth');
+    location.reload();
+}
+
+// ── GAS 请求 ──────────────────────────────────────────────────
+async function gasGet(action, params = {}) {
+    const qs = new URLSearchParams({ action, ...params });
+    const res = await fetch(`${GAS_URL}?${qs}`);
+    return res.json();
+}
+async function gasPost(body) {
+    const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) });
+    return res.json();
+}
+
+// ── 初始化 ────────────────────────────────────────────────────
+let allLessons = [];
+
+async function init() {
+    await loadLessons();
+}
+
+// ── 标签切换 ──────────────────────────────────────────────────
+function switchTab(tab, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-500'); });
+    btn.classList.add('active'); btn.classList.remove('text-slate-500');
+    ['lessons', 'analytics'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
+    if (tab === 'analytics') populateAnalyticsSelect();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  课程管理
+// ════════════════════════════════════════════════════════════════
+async function loadLessons() {
+    const container = document.getElementById('lessonList');
+    container.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
+    try {
+        const data = await gasGet('getLessons');
+        allLessons = data.lessons || [];
+        renderLessons();
+    } catch(e) {
+        container.innerHTML = '<div class="text-red-400 text-center py-10">加载失败，请检查 GAS_URL</div>';
+    }
+}
+
+function renderLessons() {
+    const container = document.getElementById('lessonList');
+    if (!allLessons.length) {
+        container.innerHTML = '<div class="text-center text-slate-300 py-16"><i class="fas fa-book-open text-4xl mb-3 block"></i>还没有课程，点上方「新建课程」开始</div>';
+        return;
+    }
+    container.innerHTML = allLessons.map(l => `
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <!-- 课程标题行 -->
+        <div class="px-6 py-5 flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="text-xs font-bold text-slate-400">${l.unit}</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-bold status-${l.status}">${l.status === 'published' ? '✅ 已发布' : '⏳ 草稿'}</span>
+                    <span class="text-xs text-slate-300">· ${l.attemptCount} 人练习</span>
+                </div>
+                <h3 class="font-black text-slate-800 text-lg truncate">${l.title}</h3>
+                <p class="text-xs text-slate-400 mt-0.5 line-clamp-1">${(l.content || '').slice(0,50)}…</p>
+            </div>
+            <div class="flex items-center gap-2 ml-4 shrink-0">
+                <button onclick="editLesson('${l.lessonId}')" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all flex items-center justify-center text-xs">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="confirmDelete('${l.lessonId}', '${l.title}')" class="w-9 h-9 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-400 transition-all flex items-center justify-center text-xs">
+                    <i class="fas fa-trash"></i>
+                </button>
+                <button onclick="copyLink('${l.lessonId}')" class="w-9 h-9 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-500 transition-all flex items-center justify-center text-xs">
+                    <i class="fas fa-link"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 生词 + 图片状态 -->
+        <div class="border-t border-slate-50 px-6 py-4 bg-slate-50/50">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-black text-slate-500">生词图片 (${l.imagesReady}/${l.totalWords} 已生成)</span>
+                <button onclick="generateAll('${l.lessonId}')" id="genAll-${l.lessonId}"
+                    class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded-full font-bold transition-all ${l.imagesReady === l.totalWords ? 'opacity-50 cursor-default' : ''}">
+                    <i class="fas fa-magic mr-1"></i>${l.imagesReady === l.totalWords ? '图片已就绪' : '批量生成图片'}
+                </button>
+            </div>
+            <div class="flex flex-wrap gap-3" id="words-${l.lessonId}">
+                ${(l.words || []).map((w, i) => renderWordChip(l.lessonId, w, i)).join('')}
+            </div>
+        </div>
+    </div>`).join('');
+}
+
+function renderWordChip(lessonId, w, i) {
+    const hasImg = !!w.imgUrl;
+    return `
+    <div class="flex items-center gap-2 bg-white rounded-2xl px-3 py-2 border border-slate-100 shadow-sm">
+        <div id="img-chip-${lessonId}-${i}">
+            ${hasImg
+                ? `<img src="${w.imgUrl}" class="img-cell" onerror="this.parentNode.innerHTML='<div class=\\'img-placeholder bg-slate-100\\'>${w.emoji||'📚'}</div>'">`
+                : `<div class="img-placeholder bg-slate-100">${w.emoji || '📚'}</div>`}
+        </div>
+        <div>
+            <div class="font-bold text-slate-800 text-sm">${w.word}</div>
+            <div class="text-xs text-slate-400">${w.pinyin}</div>
+        </div>
+        <button onclick="generateOne('${lessonId}', ${i})" id="genBtn-${lessonId}-${i}"
+            title="${hasImg ? '重新生成' : '生成图片'}"
+            class="w-7 h-7 rounded-xl ${hasImg ? 'bg-slate-100 text-slate-400' : 'bg-amber-100 text-amber-600'} hover:opacity-70 flex items-center justify-center text-xs transition-all">
+            <i class="fas fa-${hasImg ? 'redo' : 'magic'}"></i>
+        </button>
+    </div>`;
+}
+
+// ── 生成单张图片 ──────────────────────────────────────────────
+async function generateOne(lessonId, wordIndex) {
+    const btn     = document.getElementById(`genBtn-${lessonId}-${wordIndex}`);
+    const imgCell = document.getElementById(`img-chip-${lessonId}-${wordIndex}`);
+
+    btn.innerHTML = '<i class="fas fa-spinner spin"></i>';
+    btn.disabled  = true;
+    imgCell.innerHTML = `<div class="img-placeholder bg-blue-50"><i class="fas fa-spinner spin text-blue-400"></i></div>`;
+
+    try {
+        const res = await gasPost({ action: 'generateOneImage', lessonId, wordIndex });
+        if (!res.ok) throw new Error(res.error);
+
+        imgCell.innerHTML = `<img src="${res.imgUrl}" class="img-cell">`;
+        btn.innerHTML = '<i class="fas fa-check text-green-500"></i>';
+        toast(`「${res.word}」图片生成完毕 ✅`);
+        await loadLessons(); // 刷新状态
+    } catch(e) {
+        imgCell.innerHTML = `<div class="img-placeholder bg-red-50 text-red-400 text-xs">失败</div>`;
+        btn.innerHTML = '<i class="fas fa-redo"></i>';
+        btn.disabled  = false;
+        toast('生成失败：' + e.message, true);
+    }
+}
+
+// ── 批量生成 ──────────────────────────────────────────────────
+async function generateAll(lessonId) {
+    const lesson = allLessons.find(l => l.lessonId === lessonId);
+    if (!lesson) return;
+    const words = lesson.words || [];
+    const pending = words.map((w, i) => ({ w, i })).filter(({ w }) => !w.imgUrl);
+    if (!pending.length) { toast('所有图片已就绪'); return; }
+
+    const btn = document.getElementById(`genAll-${lessonId}`);
+    btn.innerHTML = `<i class="fas fa-spinner spin mr-1"></i> 生成中 (0/${pending.length})`;
+    btn.disabled = true;
+
+    let done = 0;
+    for (const { i } of pending) {
+        btn.innerHTML = `<i class="fas fa-spinner spin mr-1"></i> 生成中 (${done}/${pending.length})`;
+        await generateOne(lessonId, i);
+        done++;
+    }
+    btn.innerHTML = `<i class="fas fa-check mr-1"></i> 全部完成`;
+    btn.disabled  = false;
+}
+
+// ── 表单：新建 / 编辑 ──────────────────────────────────────────
+function toggleForm() {
+    const form    = document.getElementById('lessonForm');
+    const chevron = document.getElementById('formChevron');
+    const isOpen  = !form.classList.contains('hidden');
+    form.classList.toggle('hidden', isOpen);
+    chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    if (!isOpen && !document.getElementById('wordRows').children.length) addWordRow();
+}
+
+function addWordRow(w) {
+    const container = document.getElementById('wordRows');
+    const row = document.createElement('div');
+    row.className = 'flex gap-2 items-center';
+    row.innerHTML = `
+        <input placeholder="词语 *" value="${w?.word||''}"
+            class="w-20 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400 font-bold">
+        <input placeholder="拼音 *" value="${w?.pinyin||''}"
+            class="w-24 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400">
+        <input placeholder="Emoji" value="${w?.emoji||''}"
+            class="w-16 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400 text-center">
+        <input placeholder="图片提示（英文，可不填）" value="${w?.imgPrompt||''}"
+            class="flex-1 p-2 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-blue-400">
+        <button onclick="this.closest('div').remove()" class="w-8 h-8 rounded-xl bg-rose-50 text-rose-400 hover:bg-rose-100 flex items-center justify-center text-xs shrink-0">
+            <i class="fas fa-times"></i>
+        </button>`;
+    container.appendChild(row);
+}
+
+function getFormWords() {
+    const rows = document.getElementById('wordRows').querySelectorAll('div');
+    return [...rows].map(row => {
+        const inputs = row.querySelectorAll('input');
+        return {
+            word:      inputs[0]?.value.trim() || '',
+            pinyin:    inputs[1]?.value.trim() || '',
+            emoji:     inputs[2]?.value.trim() || '📚',
+            imgPrompt: inputs[3]?.value.trim() || '',
+            imgUrl:    ''
+        };
+    }).filter(w => w.word);
+}
+
+async function saveLesson() {
+    const editingId = document.getElementById('editingId').value;
+    const unit      = document.getElementById('f-unit').value.trim();
+    const title     = document.getElementById('f-title').value.trim();
+    const content   = document.getElementById('f-content').value.trim();
+    const words     = getFormWords();
+
+    if (!title || !content) { toast('请填写课题标题和课文内容', true); return; }
+    if (!words.length)       { toast('请至少添加一个生词', true);   return; }
+
+    try {
+        if (editingId) {
+            await gasPost({ action: 'updateLesson', lessonId: editingId, unit, title, content, words });
+            toast('课程已更新 ✅');
+        } else {
+            await gasPost({ action: 'createLesson', unit, title, content, words });
+            toast('课程已创建 ✅');
+        }
+        cancelForm();
+        await loadLessons();
+    } catch(e) { toast('保存失败：' + e.message, true); }
+}
+
+function editLesson(lessonId) {
+    const l = allLessons.find(x => x.lessonId === lessonId);
+    if (!l) return;
+    document.getElementById('editingId').value   = lessonId;
+    document.getElementById('f-unit').value      = l.unit    || '';
+    document.getElementById('f-title').value     = l.title   || '';
+    document.getElementById('f-content').value   = l.content || '';
+    document.getElementById('wordRows').innerHTML = '';
+    (l.words || []).forEach(w => addWordRow(w));
+
+    // 打开表单并滚到顶部
+    document.getElementById('lessonForm').classList.remove('hidden');
+    document.getElementById('formChevron').style.transform = 'rotate(180deg)';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelForm() {
+    document.getElementById('editingId').value    = '';
+    document.getElementById('f-unit').value       = '';
+    document.getElementById('f-title').value      = '';
+    document.getElementById('f-content').value    = '';
+    document.getElementById('wordRows').innerHTML  = '';
+    document.getElementById('lessonForm').classList.add('hidden');
+    document.getElementById('formChevron').style.transform = '';
+}
+
+async function confirmDelete(lessonId, title) {
+    if (!confirm(`确定删除「${title}」？\n此操作不可撤销。`)) return;
+    try {
+        await gasPost({ action: 'deleteLesson', lessonId });
+        toast('已删除');
+        await loadLessons();
+    } catch(e) { toast('删除失败：' + e.message, true); }
+}
+
+function copyLink(lessonId) {
+    const url = location.origin + location.pathname.replace('teacher.html', 'index.html');
+    navigator.clipboard.writeText(url).then(() => toast('学生链接已复制！'));
+}
+
+// ════════════════════════════════════════════════════════════════
+//  学生数据分析
+// ════════════════════════════════════════════════════════════════
+function populateAnalyticsSelect() {
+    const sel = document.getElementById('analyticsLessonSelect');
+    sel.innerHTML = '<option value="">— 请选择 —</option>' +
+        allLessons.map(l => `<option value="${l.lessonId}">${l.title}</option>`).join('');
+}
+
+async function loadAnalytics() {
+    const lessonId = document.getElementById('analyticsLessonSelect').value;
+    const content  = document.getElementById('analyticsContent');
+    if (!lessonId) { content.innerHTML = '<div class="text-center text-slate-400 py-16">请选择课程查看数据</div>'; return; }
+
+    content.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
+    try {
+        const { lesson, attempts } = await gasGet('getAnalytics', { lessonId });
+        renderAnalytics(lesson, attempts);
+    } catch(e) { content.innerHTML = '<div class="text-red-400 text-center py-10">加载失败</div>'; }
+}
+
+function renderAnalytics(lesson, attempts) {
+    const content   = document.getElementById('analyticsContent');
+    const completed = attempts.filter(a => a.completedAt);
+    const avgScore  = completed.length
+        ? Math.round(completed.reduce((s, a) => s + (a.totalScore || 0), 0) / completed.length)
+        : 0;
+
+    content.innerHTML = `
+    <!-- 汇总卡 -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+        ${[
+            ['参与人数', attempts.length,   'blue'],
+            ['完成人数', completed.length,  'green'],
+            ['平均得分', avgScore,           'amber']
+        ].map(([label,val,c]) => `
+        <div class="bg-white rounded-2xl p-5 text-center shadow-sm border border-${c}-100">
+            <div class="text-3xl font-black text-${c}-600 mb-1">${val}</div>
+            <div class="text-xs font-bold text-${c}-400">${label}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- 得分图表 -->
+    ${completed.length >= 2 ? `
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6">
+        <h3 class="font-black text-slate-700 mb-4">得分分布</h3>
+        <canvas id="scoreChart" height="100"></canvas>
+    </div>` : ''}
+
+    <!-- 学生明细 -->
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-50 font-black text-slate-700">学生成绩单</div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50 border-b border-slate-100">
+                    <tr>
+                        <th class="text-left px-6 py-3 font-bold text-slate-500">姓名</th>
+                        <th class="text-center px-4 py-3 font-bold text-slate-500">总分</th>
+                        <th class="text-center px-4 py-3 font-bold text-slate-500">完成</th>
+                        <th class="text-left px-4 py-3 font-bold text-slate-500">时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${!attempts.length
+                        ? `<tr><td colspan="4" class="text-center py-10 text-slate-300">还没有学生参与</td></tr>`
+                        : attempts.map(a => `
+                    <tr class="border-t border-slate-50 hover:bg-slate-50/50">
+                        <td class="px-6 py-4 font-bold text-slate-800">${a.studentName}</td>
+                        <td class="px-4 py-4 text-center font-black text-blue-600">${a.totalScore ?? '—'}</td>
+                        <td class="px-4 py-4 text-center">${a.completedAt ? '✅' : '🔄'}</td>
+                        <td class="px-4 py-4 text-slate-400 text-xs">${new Date(a.startedAt).toLocaleString('zh-CN',{hour12:false})}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>`;
+
+    if (completed.length >= 2) {
+        new Chart(document.getElementById('scoreChart'), {
+            type: 'bar',
+            data: {
+                labels:   completed.map(a => a.studentName),
+                datasets: [{ label:'总分', data: completed.map(a => a.totalScore||0),
+                    backgroundColor:'rgba(59,130,246,0.5)', borderColor:'rgb(59,130,246)',
+                    borderWidth:2, borderRadius:8 }]
+            },
+            options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+        });
+    }
+}
+
+// ── 工具 ──────────────────────────────────────────────────────
+function toast(msg, isError = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-2xl z-[200] text-sm font-bold text-white transition-all ${isError ? 'bg-rose-600' : 'bg-slate-800'}`;
+    el.classList.remove('hidden');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+</script>
+</body>
+</html>
