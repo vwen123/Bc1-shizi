@@ -12,6 +12,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- HanziWriter 延迟加载（只在笔顺弹窗用） -->
     <script defer src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- font-display:swap：字体未载入时先用系统字体，不阻塞渲染 -->
     <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700;900&display=swap&font-display=swap" rel="stylesheet">
@@ -169,20 +172,17 @@
 
 <script>
 // ════════════════════════════════════════
-//  配置
+//  Firebase 初始化
 // ════════════════════════════════════════
-const GAS_URL = "https://script.google.com/macros/s/AKfycbw6PnIno0lRo-L54fvR7y63JqcFTmvDN0Xl48qpOpSZoD2ABZ4MFTa1YBkK-ZewTC6WTg/exec";
-
-// ── GAS 请求 ──────────────────────────────────────────────────
-async function gasGet(action, params = {}) {
-    const qs  = new URLSearchParams({ action, ...params });
-    const res = await fetch(`${GAS_URL}?${qs}`);
-    return res.json();
-}
-async function gasPost(body) {
-    const res = await fetch(GAS_URL, { method:'POST', body:JSON.stringify(body) });
-    return res.json();
-}
+firebase.initializeApp({
+    apiKey:            "AIzaSyCVnBotyPuwS9xfUl7YCN2jS7gXUHIQyHc",
+    authDomain:        "huawen-class.firebaseapp.com",
+    projectId:         "huawen-class",
+    storageBucket:     "huawen-class.firebasestorage.app",
+    messagingSenderId: "606012248377",
+    appId:             "1:606012248377:web:7f55bb58ed2abd1c4458e8"
+});
+const db = firebase.firestore();
 
 // ════════════════════════════════════════
 //  应用状态
@@ -200,57 +200,22 @@ let _rec             = null;   // 当前录音实例
 let _recId           = null;   // 当前录音的 id
 
 // ════════════════════════════════════════
-//  初始化 — 从 GAS 加载课程
+//  初始化 — 从 Firestore 加载课程
 // ════════════════════════════════════════
-// ── 课程缓存（避免每次都等 GAS，30 分钟有效）────────────────
-const LESSON_CACHE_KEY = 'shizi_lessons_v1';
-const LESSON_CACHE_TTL = 30 * 60 * 1000; // 30 分钟
-
-function getCachedLessons() {
-    try {
-        const raw = localStorage.getItem(LESSON_CACHE_KEY);
-        if (!raw) return null;
-        const { data, ts } = JSON.parse(raw);
-        if (Date.now() - ts > LESSON_CACHE_TTL) return null; // 过期
-        return data;
-    } catch(e) { return null; }
-}
-
-function saveLessonsCache(lessons) {
-    try {
-        localStorage.setItem(LESSON_CACHE_KEY,
-            JSON.stringify({ data: lessons, ts: Date.now() }));
-    } catch(e) {}
-}
-
 window.onload = async () => {
     const saved = localStorage.getItem('shizi_studentName');
     if (saved) document.getElementById('inputName').value = saved;
 
-    // ① 先用缓存立即显示（让学生感觉秒开）
-    const cached = getCachedLessons();
-    if (cached && cached.length) {
-        allLessons = cached;
-        renderLessonMenu();
-    }
-
-    // ② 背景静默拉取最新数据并更新缓存
     try {
-        const data   = await gasGet('getLessons');
-        const fresh  = (data.lessons || []).filter(l => l.status === 'published');
-        saveLessonsCache(fresh);
-
-        // 只有课程有变化才重新渲染（避免无谓闪烁）
-        if (JSON.stringify(fresh) !== JSON.stringify(allLessons)) {
-            allLessons = fresh;
-            renderLessonMenu();
-        }
+        const snap = await db.collection('lessons')
+            .where('status', '==', 'published')
+            .orderBy('createdAt', 'asc')
+            .get();
+        allLessons = snap.docs.map(d => ({ lessonId: d.id, ...d.data() }));
+        renderLessonMenu();
     } catch(e) {
-        if (!cached) {
-            document.getElementById('lessonMenu').innerHTML =
-                '<div class="text-red-400 text-sm text-center py-6">课程加载失败，请检查网络</div>';
-        }
-        // 有缓存的话静默失败，学生不受影响
+        document.getElementById('lessonMenu').innerHTML =
+            '<div class="text-red-400 text-sm text-center py-6">课程加载失败，请检查网络</div>';
     }
 };
 
@@ -668,20 +633,26 @@ function checkAllDone() {
 // ════════════════════════════════════════
 async function saveAttemptToGAS(completed = false) {
     const total = Object.values(itemScores).reduce((a, b) => a + b, 0);
-    const body  = {
-        action:       'saveAttempt',
-        attemptId:    currentAttemptId,
-        lessonId:     currentLesson.lessonId,
-        studentName,
-        lessonTitle:  currentLesson.title,
-        unit:         currentLesson.unit,
-        scores:       itemScores,
-        totalScore:   total,
-        completedAt:  completed ? new Date().toISOString() : undefined
-    };
     try {
-        const res = await gasPost(body);
-        if (res.ok && !currentAttemptId) currentAttemptId = res.attemptId;
+        if (!currentAttemptId) {
+            // 新建练习记录
+            const ref = await db.collection('attempts').add({
+                lessonId:    currentLesson.lessonId,
+                lessonTitle: currentLesson.title,
+                unit:        currentLesson.unit,
+                studentName,
+                scores:      itemScores,
+                totalScore:  total,
+                startedAt:   firebase.firestore.FieldValue.serverTimestamp(),
+                completedAt: completed ? firebase.firestore.FieldValue.serverTimestamp() : null
+            });
+            currentAttemptId = ref.id;
+        } else {
+            // 更新现有记录
+            const update = { scores: itemScores, totalScore: total };
+            if (completed) update.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('attempts').doc(currentAttemptId).update(update);
+        }
     } catch(e) { /* 静默 */ }
 }
 

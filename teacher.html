@@ -8,6 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/pinyin-pro/dist/index.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; background:#f1f5f9; }
@@ -174,8 +177,17 @@
 <div id="toast" class="hidden fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-2xl shadow-2xl z-[200] text-sm font-bold"></div>
 
 <script>
-// ── 配置 ──────────────────────────────────────────────────────
-const GAS_URL = "https://script.google.com/macros/s/AKfycbw6PnIno0lRo-L54fvR7y63JqcFTmvDN0Xl48qpOpSZoD2ABZ4MFTa1YBkK-ZewTC6WTg/exec";
+// ── Firebase 初始化 ───────────────────────────────────────────
+firebase.initializeApp({
+    apiKey:            "AIzaSyCVnBotyPuwS9xfUl7YCN2jS7gXUHIQyHc",
+    authDomain:        "huawen-class.firebaseapp.com",
+    projectId:         "huawen-class",
+    storageBucket:     "huawen-class.firebasestorage.app",
+    messagingSenderId: "606012248377",
+    appId:             "1:606012248377:web:7f55bb58ed2abd1c4458e8"
+});
+const db = firebase.firestore();
+
 const TEACHER_PIN = "8888"; // 修改此处更改密码
 
 // ── PIN 验证 ──────────────────────────────────────────────────
@@ -208,17 +220,6 @@ function logout() {
     location.reload();
 }
 
-// ── GAS 请求 ──────────────────────────────────────────────────
-async function gasGet(action, params = {}) {
-    const qs = new URLSearchParams({ action, ...params });
-    const res = await fetch(`${GAS_URL}?${qs}`);
-    return res.json();
-}
-async function gasPost(body) {
-    const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(body) });
-    return res.json();
-}
-
 // ── 初始化 ────────────────────────────────────────────────────
 let allLessons = [];
 
@@ -226,23 +227,43 @@ async function init() {
     await loadLessons();
 }
 
+// ── 一键初始化预设 6 课（直接写入 Firestore）─────────────────
 async function setupLessons() {
     const btn = document.querySelector('#setupBanner button');
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 初始化中...';
     btn.disabled = true;
+    const IMG = 'https://vven123.github.io/Bc1-shizi/images/';
+    const LESSONS = [
+        { unit:'第一单元·新的开始', title:'一、上学了', content:'上学了，上学了。花儿跟我招招手，太阳跟我一起走，一起走到校门口。',
+          words:[{word:'上学',pinyin:'shàng xué',emoji:'🎒',imgUrl:IMG+'shang-xue.png'},{word:'花儿',pinyin:'huā r',emoji:'🌸',imgUrl:IMG+'hua-er.png'},{word:'太阳',pinyin:'tài yáng',emoji:'☀️',imgUrl:IMG+'tai-yang.png'},{word:'校门',pinyin:'xiào mén',emoji:'🏫',imgUrl:IMG+'xiao-men.png'}]},
+        { unit:'第一单元·新的开始', title:'二、早操', content:'小鸟儿，起得早，跳来跳去在树枝上做早操。小朋友，起得早，跑来跑去在草地上做早操。',
+          words:[{word:'小鸟',pinyin:'xiǎo niǎo',emoji:'🐦',imgUrl:IMG+'xiao-niao.png'},{word:'早操',pinyin:'zǎo cāo',emoji:'🤸',imgUrl:IMG+'zao-cao.png'},{word:'树枝',pinyin:'shù zhī',emoji:'🌿',imgUrl:IMG+'shu-zhi.png'},{word:'草地',pinyin:'cǎo dì',emoji:'🌱',imgUrl:IMG+'cao-di.png'}]},
+        { unit:'第二单元·走进教室', title:'一、识字读书长知识', content:'上课了，来识字，识了字儿会读书。读儿歌，读故事，天天学习长知识。',
+          words:[{word:'识字',pinyin:'shí zì',emoji:'📝',imgUrl:IMG+'shi-zi.png'},{word:'读书',pinyin:'dú shū',emoji:'📖',imgUrl:IMG+'du-shu.png'},{word:'知识',pinyin:'zhī shi',emoji:'💡',imgUrl:IMG+'zhi-shi.png'},{word:'儿歌',pinyin:'ér gē',emoji:'🎵',imgUrl:IMG+'er-ge.png'}]},
+        { unit:'第二单元·走进教室', title:'二、学写字', content:'小朋友，学写字，一笔一画要写好，眼到手到心也到，笔画笔顺错不了。',
+          words:[{word:'写字',pinyin:'xiě zì',emoji:'✏️',imgUrl:IMG+'xie-zi.png'},{word:'笔画',pinyin:'bǐ huà',emoji:'🖊️',imgUrl:IMG+'bi-hua.png'},{word:'笔顺',pinyin:'bǐ shùn',emoji:'↕️',imgUrl:IMG+'bi-shun.png'},{word:'眼到',pinyin:'yǎn dào',emoji:'👀',imgUrl:IMG+'yan-dao.png'}]},
+        { unit:'第三单元·我爱我的家', title:'一、笑声回来了', content:'门开了，爸爸妈妈笑着回来了。门开了，哥哥姐姐笑着回来了。门开了，全家的笑声回来了。',
+          words:[{word:'笑声',pinyin:'xiào shēng',emoji:'😄',imgUrl:IMG+'xiao-sheng.png'},{word:'爸爸',pinyin:'bà ba',emoji:'👨',imgUrl:IMG+'ba-ba.png'},{word:'妈妈',pinyin:'mā ma',emoji:'👩',imgUrl:IMG+'ma-ma.png'},{word:'回来',pinyin:'huí lái',emoji:'🚪',imgUrl:IMG+'hui-lai.png'}]},
+        { unit:'第三单元·我爱我的家', title:'二、星星', content:'天上星星那么多，这一颗我妈妈，那一颗我爸爸，中间的一颗是我。三颗星星靠得那样近，那样亲，三颗星星那样明。',
+          words:[{word:'星星',pinyin:'xīng xīng',emoji:'⭐',imgUrl:IMG+'xing-xing.png'},{word:'天上',pinyin:'tiān shàng',emoji:'🌌',imgUrl:IMG+'tian-shang.png'},{word:'中间',pinyin:'zhōng jiān',emoji:'✨',imgUrl:IMG+'zhong-jian.png'},{word:'三颗',pinyin:'sān kē',emoji:'🌟',imgUrl:IMG+'san-ke.png'}]}
+    ];
     try {
-        const res = await gasPost({ action: 'setupInitialLessons' });
-        if (res.ok !== false) {
-            toast('✅ 课程初始化成功！');
-            document.getElementById('setupBanner').classList.add('hidden');
-            await loadLessons();
-        } else {
-            toast(res.error || '初始化失败', true);
-        }
+        const snap = await db.collection('lessons').limit(1).get();
+        if (!snap.empty) { toast('已有课程，无需重复初始化'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i> 立即初始化'; return; }
+        const batch = db.batch();
+        LESSONS.forEach(l => {
+            const ref = db.collection('lessons').doc();
+            batch.set(ref, { ...l, status: 'published', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        });
+        await batch.commit();
+        toast('✅ 课程初始化成功！');
+        document.getElementById('setupBanner').classList.add('hidden');
+        await loadLessons();
     } catch(e) {
         toast('失败：' + e.message, true);
     } finally {
         btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> 立即初始化';
     }
 }
 
@@ -261,11 +282,24 @@ async function loadLessons() {
     const container = document.getElementById('lessonList');
     container.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
     try {
-        const data = await gasGet('getLessons');
-        allLessons = data.lessons || [];
+        const snap = await db.collection('lessons').orderBy('createdAt', 'asc').get();
+        // 取每课的练习人数
+        const attSnap = await db.collection('attempts').get();
+        const attByLesson = {};
+        attSnap.docs.forEach(d => {
+            const lid = d.data().lessonId;
+            if (!attByLesson[lid]) attByLesson[lid] = { total: 0, completed: 0 };
+            attByLesson[lid].total++;
+            if (d.data().completedAt) attByLesson[lid].completed++;
+        });
+        allLessons = snap.docs.map(d => {
+            const data = d.data();
+            const att  = attByLesson[d.id] || { total: 0, completed: 0 };
+            return { lessonId: d.id, ...data, attemptCount: att.total, completedCount: att.completed };
+        }).reverse();
         renderLessons();
     } catch(e) {
-        container.innerHTML = '<div class="text-red-400 text-center py-10">加载失败，请检查 GAS_URL</div>';
+        container.innerHTML = '<div class="text-red-400 text-center py-10">加载失败：' + e.message + '</div>';
     }
 }
 
@@ -427,10 +461,10 @@ async function saveLesson() {
 
     try {
         if (editingId) {
-            await gasPost({ action: 'updateLesson', lessonId: editingId, unit, title, content, words });
+            await db.collection('lessons').doc(editingId).update({ unit, title, content, words });
             toast('课程已更新 ✅');
         } else {
-            await gasPost({ action: 'createLesson', unit, title, content, words });
+            await db.collection('lessons').add({ unit, title, content, words, status: 'draft', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
             toast('课程已创建 ✅');
         }
         cancelForm();
@@ -467,7 +501,7 @@ function cancelForm() {
 async function confirmDelete(lessonId, title) {
     if (!confirm(`确定删除「${title}」？\n此操作不可撤销。`)) return;
     try {
-        await gasPost({ action: 'deleteLesson', lessonId });
+        await db.collection('lessons').doc(lessonId).delete();
         toast('已删除');
         await loadLessons();
     } catch(e) { toast('删除失败：' + e.message, true); }
@@ -494,9 +528,17 @@ async function loadAnalytics() {
 
     content.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
     try {
-        const { lesson, attempts } = await gasGet('getAnalytics', { lessonId });
+        const lessonDoc = await db.collection('lessons').doc(lessonId).get();
+        const lesson    = { lessonId, ...lessonDoc.data() };
+        const attSnap   = await db.collection('attempts')
+            .where('lessonId', '==', lessonId)
+            .orderBy('startedAt', 'desc').get();
+        const attempts  = attSnap.docs.map(d => ({ attemptId: d.id, ...d.data(),
+            startedAt:   d.data().startedAt?.toDate?.()?.toISOString() || '',
+            completedAt: d.data().completedAt?.toDate?.()?.toISOString() || ''
+        }));
         renderAnalytics(lesson, attempts);
-    } catch(e) { content.innerHTML = '<div class="text-red-400 text-center py-10">加载失败</div>'; }
+    } catch(e) { content.innerHTML = '<div class="text-red-400 text-center py-10">加载失败：' + e.message + '</div>'; }
 }
 
 function renderAnalytics(lesson, attempts) {
