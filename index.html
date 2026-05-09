@@ -4,10 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小状元识字 - 快乐学习每一天</title>
+    <!-- 预连接：提前建立连接，减少延迟 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="https://vven123.github.io">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+    <!-- HanziWriter 延迟加载（只在笔顺弹窗用） -->
+    <script defer src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- font-display:swap：字体未载入时先用系统字体，不阻塞渲染 -->
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700;900&display=swap&font-display=swap" rel="stylesheet">
     <style>
         :root { --primary:#3b82f6; --secondary:#f43f5e; --accent:#f59e0b; }
         body { font-family:'Noto Sans SC',sans-serif; background:#f8fafc; min-height:100vh; color:#1e293b; }
@@ -195,17 +202,55 @@ let _recId           = null;   // 当前录音的 id
 // ════════════════════════════════════════
 //  初始化 — 从 GAS 加载课程
 // ════════════════════════════════════════
+// ── 课程缓存（避免每次都等 GAS，30 分钟有效）────────────────
+const LESSON_CACHE_KEY = 'shizi_lessons_v1';
+const LESSON_CACHE_TTL = 30 * 60 * 1000; // 30 分钟
+
+function getCachedLessons() {
+    try {
+        const raw = localStorage.getItem(LESSON_CACHE_KEY);
+        if (!raw) return null;
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts > LESSON_CACHE_TTL) return null; // 过期
+        return data;
+    } catch(e) { return null; }
+}
+
+function saveLessonsCache(lessons) {
+    try {
+        localStorage.setItem(LESSON_CACHE_KEY,
+            JSON.stringify({ data: lessons, ts: Date.now() }));
+    } catch(e) {}
+}
+
 window.onload = async () => {
     const saved = localStorage.getItem('shizi_studentName');
     if (saved) document.getElementById('inputName').value = saved;
 
-    try {
-        const data = await gasGet('getLessons');
-        allLessons = (data.lessons || []).filter(l => l.status === 'published');
+    // ① 先用缓存立即显示（让学生感觉秒开）
+    const cached = getCachedLessons();
+    if (cached && cached.length) {
+        allLessons = cached;
         renderLessonMenu();
+    }
+
+    // ② 背景静默拉取最新数据并更新缓存
+    try {
+        const data   = await gasGet('getLessons');
+        const fresh  = (data.lessons || []).filter(l => l.status === 'published');
+        saveLessonsCache(fresh);
+
+        // 只有课程有变化才重新渲染（避免无谓闪烁）
+        if (JSON.stringify(fresh) !== JSON.stringify(allLessons)) {
+            allLessons = fresh;
+            renderLessonMenu();
+        }
     } catch(e) {
-        document.getElementById('lessonMenu').innerHTML =
-            '<div class="text-red-400 text-sm text-center py-6">课程加载失败，请联系老师</div>';
+        if (!cached) {
+            document.getElementById('lessonMenu').innerHTML =
+                '<div class="text-red-400 text-sm text-center py-6">课程加载失败，请检查网络</div>';
+        }
+        // 有缓存的话静默失败，学生不受影响
     }
 };
 
@@ -283,7 +328,7 @@ function renderWords() {
             <!-- 图片区 -->
             <div id="img-box-${id}" class="h-52 relative flex items-center justify-center overflow-hidden ${w.imgUrl ? '' : 'bg-blue-50'}">
                 ${w.imgUrl
-                    ? `<img src="${w.imgUrl}" class="w-full h-full object-cover"
+                    ? `<img src="${w.imgUrl}" loading="lazy" class="w-full h-full object-cover"
                            onerror="this.parentNode.innerHTML='<span class=\\'text-7xl\\'>${w.emoji||'📚'}</span>'">`
                     : `<span class="text-7xl">${w.emoji || '📚'}</span>`}
             </div>
