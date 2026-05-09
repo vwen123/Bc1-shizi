@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
-    <link rel="dns-prefetch" href="https://vven123.github.io">
+    <link rel="dns-prefetch" href="https://vwen123.github.io">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- HanziWriter 延迟加载（只在笔顺弹窗用） -->
     <script defer src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
@@ -207,11 +207,11 @@ window.onload = async () => {
     if (saved) document.getElementById('inputName').value = saved;
 
     try {
-        const snap = await db.collection('lessons')
-            .where('status', '==', 'published')
-            .orderBy('createdAt', 'asc')
-            .get();
-        allLessons = snap.docs.map(d => ({ lessonId: d.id, ...d.data() }));
+        const snap = await db.collection('lessons').get();
+        allLessons = snap.docs
+            .map(d => ({ lessonId: d.id, ...d.data() }))
+            .filter(l => l.status === 'published')
+            .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
         renderLessonMenu();
     } catch(e) {
         document.getElementById('lessonMenu').innerHTML =

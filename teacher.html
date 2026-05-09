@@ -232,7 +232,7 @@ async function setupLessons() {
     const btn = document.querySelector('#setupBanner button');
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 初始化中...';
     btn.disabled = true;
-    const IMG = 'https://vven123.github.io/Bc1-shizi/images/';
+    const IMG = 'https://vwen123.github.io/Bc1-shizi/images/';
     const LESSONS = [
         { unit:'第一单元·新的开始', title:'一、上学了', content:'上学了，上学了。花儿跟我招招手，太阳跟我一起走，一起走到校门口。',
           words:[{word:'上学',pinyin:'shàng xué',emoji:'🎒',imgUrl:IMG+'shang-xue.png'},{word:'花儿',pinyin:'huā r',emoji:'🌸',imgUrl:IMG+'hua-er.png'},{word:'太阳',pinyin:'tài yáng',emoji:'☀️',imgUrl:IMG+'tai-yang.png'},{word:'校门',pinyin:'xiào mén',emoji:'🏫',imgUrl:IMG+'xiao-men.png'}]},
@@ -282,8 +282,7 @@ async function loadLessons() {
     const container = document.getElementById('lessonList');
     container.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
     try {
-        const snap = await db.collection('lessons').orderBy('createdAt', 'asc').get();
-        // 取每课的练习人数
+        const snap = await db.collection('lessons').get();
         const attSnap = await db.collection('attempts').get();
         const attByLesson = {};
         attSnap.docs.forEach(d => {
@@ -292,14 +291,20 @@ async function loadLessons() {
             attByLesson[lid].total++;
             if (d.data().completedAt) attByLesson[lid].completed++;
         });
-        allLessons = snap.docs.map(d => {
-            const data = d.data();
-            const att  = attByLesson[d.id] || { total: 0, completed: 0 };
-            return { lessonId: d.id, ...data, attemptCount: att.total, completedCount: att.completed };
-        }).reverse();
+        allLessons = snap.docs
+            .map(d => {
+                const data = d.data();
+                const att  = attByLesson[d.id] || { total: 0, completed: 0 };
+                return { lessonId: d.id, ...data, attemptCount: att.total, completedCount: att.completed };
+            })
+            .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
+            .reverse();
         renderLessons();
     } catch(e) {
-        container.innerHTML = '<div class="text-red-400 text-center py-10">加载失败：' + e.message + '</div>';
+        allLessons = [];
+        renderLessons();
+        container.insertAdjacentHTML('beforeend',
+            `<div class="text-red-400 text-sm text-center mt-4">载入失败：${e.message}</div>`);
     }
 }
 
