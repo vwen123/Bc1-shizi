@@ -547,6 +547,8 @@ async function loadAnalytics() {
 }
 
 function renderAnalytics(lesson, attempts) {
+    _exportLesson   = lesson;
+    _exportAttempts = attempts;
     const content   = document.getElementById('analyticsContent');
     const completed = attempts.filter(a => a.completedAt);
     const avgScore  = completed.length
@@ -576,9 +578,20 @@ function renderAnalytics(lesson, attempts) {
 
     <!-- 学生明细 -->
     <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-50 font-black text-slate-700">学生成绩单</div>
+        <div class="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
+            <span class="font-black text-slate-700">学生成绩单</span>
+            ${attempts.length ? `
+            <div class="flex gap-2">
+                <button onclick="downloadCSV()" class="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-xl text-xs font-bold transition-all">
+                    <i class="fas fa-file-csv"></i> 下载 CSV
+                </button>
+                <button onclick="downloadPDF()" class="flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-xs font-bold transition-all">
+                    <i class="fas fa-file-pdf"></i> 下载 PDF
+                </button>
+            </div>` : ''}
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-sm">
+            <table id="attemptsTable" class="w-full text-sm">
                 <thead class="bg-slate-50 border-b border-slate-100">
                     <tr>
                         <th class="text-left px-6 py-3 font-bold text-slate-500">姓名</th>
@@ -594,7 +607,7 @@ function renderAnalytics(lesson, attempts) {
                     <tr class="border-t border-slate-50 hover:bg-slate-50/50">
                         <td class="px-6 py-4 font-bold text-slate-800">${a.studentName}</td>
                         <td class="px-4 py-4 text-center font-black text-blue-600">${a.totalScore ?? '—'}</td>
-                        <td class="px-4 py-4 text-center">${a.completedAt ? '✅' : '🔄'}</td>
+                        <td class="px-4 py-4 text-center">${a.completedAt ? '完成' : '进行中'}</td>
                         <td class="px-4 py-4 text-slate-400 text-xs">${new Date(a.startedAt).toLocaleString('zh-CN',{hour12:false})}</td>
                     </tr>`).join('')}
                 </tbody>
@@ -614,6 +627,73 @@ function renderAnalytics(lesson, attempts) {
             options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
         });
     }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  导出功能
+// ════════════════════════════════════════════════════════════════
+let _exportLesson   = null;
+let _exportAttempts = [];
+
+function downloadCSV() {
+    if (!_exportAttempts.length) { toast('没有数据可导出', true); return; }
+    const rows = [
+        ['姓名', '总分', '完成状态', '开始时间', '完成时间'],
+        ..._exportAttempts.map(a => [
+            a.studentName,
+            a.totalScore ?? '',
+            a.completedAt ? '完成' : '进行中',
+            a.startedAt   ? new Date(a.startedAt).toLocaleString('zh-CN',{hour12:false}) : '',
+            a.completedAt ? new Date(a.completedAt).toLocaleString('zh-CN',{hour12:false}) : ''
+        ])
+    ];
+    const bom = '﻿';
+    const csv = bom + rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `${_exportLesson?.title || '成绩单'}_${new Date().toLocaleDateString('zh-CN')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function downloadPDF() {
+    if (!_exportAttempts.length) { toast('没有数据可导出', true); return; }
+    const title    = _exportLesson?.title || '成绩单';
+    const date     = new Date().toLocaleDateString('zh-CN');
+    const rows     = _exportAttempts.map(a => `
+        <tr>
+            <td>${a.studentName}</td>
+            <td style="text-align:center;font-weight:900;color:#3b82f6">${a.totalScore ?? '—'}</td>
+            <td style="text-align:center">${a.completedAt ? '✅ 完成' : '🔄 进行中'}</td>
+            <td style="color:#94a3b8;font-size:11px">${a.startedAt ? new Date(a.startedAt).toLocaleString('zh-CN',{hour12:false}) : ''}</td>
+        </tr>`).join('');
+
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head>
+        <meta charset="UTF-8">
+        <title>${title} 成绩单</title>
+        <style>
+            body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; padding: 40px; color: #1e293b; }
+            h1   { font-size: 22px; margin-bottom: 4px; }
+            p    { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+            table{ width: 100%; border-collapse: collapse; font-size: 14px; }
+            th   { background: #f8fafc; padding: 10px 14px; text-align: left; font-weight: 700; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+            td   { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+            tr:hover td { background: #f8fafc; }
+            @media print { button { display:none; } }
+        </style>
+    </head><body>
+        <h1>📊 ${title} · 学生成绩单</h1>
+        <p>导出时间：${date} &nbsp;·&nbsp; 共 ${_exportAttempts.length} 人参与</p>
+        <button onclick="window.print()" style="margin-bottom:20px;padding:8px 20px;background:#3b82f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px">打印 / 存为 PDF</button>
+        <table>
+            <thead><tr><th>姓名</th><th>总分</th><th>完成状态</th><th>时间</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </body></html>`);
+    win.document.close();
 }
 
 // ── 工具 ──────────────────────────────────────────────────────
