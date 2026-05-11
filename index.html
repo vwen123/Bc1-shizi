@@ -67,9 +67,14 @@
         <h1 class="text-4xl font-black text-blue-600 mb-2 tracking-tight">小状元识字</h1>
         <p class="text-slate-400 mb-8 font-medium">像状元一样快乐读书</p>
 
+        <div class="text-left mb-4">
+            <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">班级代码</label>
+            <input id="inputClass" type="text" placeholder="例：YANI1A"
+                   class="w-full px-6 py-4 border-2 border-slate-100 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/50 uppercase">
+        </div>
         <div class="text-left mb-6">
-            <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">输入你的名字</label>
-            <input id="inputName" type="text" placeholder="大名鼎鼎的小状元..."
+            <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">输入你的代号</label>
+            <input id="inputName" type="text" placeholder="输入你的代号..."
                    class="w-full px-6 py-4 border-2 border-slate-100 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/50">
         </div>
 
@@ -164,6 +169,10 @@
             <div class="text-sm font-bold text-blue-600 uppercase mb-1">状元总得分</div>
             <div id="rewardScore" class="text-5xl font-black text-blue-600">0</div>
         </div>
+        <a id="leaderboardLink" href="leaderboard.html"
+            class="block w-full bg-amber-500 hover:bg-amber-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl mb-3 text-center">
+            🏆 查看班级排行榜
+        </a>
         <button onclick="goHome()" class="w-full bg-slate-800 hover:bg-black text-white py-5 rounded-2xl font-black text-lg shadow-xl">
             返回首页
         </button>
@@ -191,20 +200,23 @@ let allLessons    = [];
 let currentLesson = null;
 let currentParas  = [];
 let studentName   = '';
+let classCode     = '';
 let itemScores    = {};
 let totalItems    = 0;
 let currentAttemptId = null;
 let activeQuizWriter = null;
 let activeQuizId     = null;
-let _rec             = null;   // 当前录音实例
-let _recId           = null;   // 当前录音的 id
+let _rec             = null;
+let _recId           = null;
 
 // ════════════════════════════════════════
 //  初始化 — 从 Firestore 加载课程
 // ════════════════════════════════════════
 window.onload = async () => {
-    const saved = localStorage.getItem('shizi_studentName');
-    if (saved) document.getElementById('inputName').value = saved;
+    const savedName  = localStorage.getItem('shizi_studentName');
+    const savedClass = localStorage.getItem('shizi_classCode');
+    if (savedName)  document.getElementById('inputName').value  = savedName;
+    if (savedClass) document.getElementById('inputClass').value = savedClass;
 
     try {
         const snap = await db.collection('lessons').get();
@@ -251,8 +263,11 @@ function renderLessonMenu() {
 //  开始课程
 // ════════════════════════════════════════
 function startLesson(idx) {
+    classCode   = document.getElementById('inputClass').value.trim().toUpperCase();
     studentName = document.getElementById('inputName').value.trim();
-    if (!studentName) { showMsg('状元公，请先赐名哦！'); return; }
+    if (!classCode)   { showMsg('请输入班级代码！'); return; }
+    if (!studentName) { showMsg('状元公，请先赐代号哦！'); return; }
+    localStorage.setItem('shizi_classCode',   classCode);
     localStorage.setItem('shizi_studentName', studentName);
 
     currentLesson    = allLessons[idx];
@@ -622,6 +637,7 @@ function checkAllDone() {
         setTimeout(() => {
             document.getElementById('rewardName').textContent  = `${studentName} 功德圆满，全课通关！`;
             document.getElementById('rewardScore').textContent = total;
+            document.getElementById('leaderboardLink').href    = `leaderboard.html?class=${classCode}`;
             showScreen('screenReward');
             launchConfetti();
         }, 1000);
@@ -640,6 +656,7 @@ async function saveAttemptToGAS(completed = false) {
                 lessonId:    currentLesson.lessonId,
                 lessonTitle: currentLesson.title,
                 unit:        currentLesson.unit,
+                classCode,
                 studentName,
                 scores:      itemScores,
                 totalScore:  total,

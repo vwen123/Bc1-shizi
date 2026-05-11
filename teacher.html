@@ -30,14 +30,16 @@
     <div class="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm text-center">
         <div class="text-5xl mb-4">🔐</div>
         <h1 class="text-2xl font-black text-slate-800 mb-1">老师控制台</h1>
-        <p class="text-slate-400 text-sm mb-8">请输入教师密码</p>
+        <p class="text-slate-400 text-sm mb-8">请输入班级代码和教师密码</p>
+        <input id="classInput" type="text" placeholder="班级代码（如 YANI1A）" maxlength="10"
+            class="w-full text-center text-xl p-4 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-400 mb-3 uppercase tracking-widest">
         <input id="pinInput" type="password" placeholder="密码" maxlength="8"
             class="w-full text-center text-2xl p-4 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-400 mb-4 tracking-widest">
         <button onclick="checkPin()"
             class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black text-lg transition-all">
             进入
         </button>
-        <p class="text-xs text-slate-300 mt-4">默认密码：8888（可在代码中修改）</p>
+        <p class="text-xs text-slate-300 mt-4">默认密码：8888</p>
     </div>
 </div>
 
@@ -50,7 +52,7 @@
             <span class="text-2xl">🌟</span>
             <div>
                 <h1 class="font-black text-slate-800 leading-tight">小状元识字</h1>
-                <p class="text-[10px] text-slate-400 uppercase tracking-widest">老师控制台</p>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest">老师控制台 · <span id="headerClassCode" class="text-blue-500 font-black"></span></p>
             </div>
         </div>
         <div class="flex items-center gap-3">
@@ -188,18 +190,24 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
-const TEACHER_PIN = "8888"; // 修改此处更改密码
+const TEACHER_PIN = "8888";
+
+let currentClassCode = '';
 
 // ── PIN 验证 ──────────────────────────────────────────────────
 function checkPin() {
+    const cls = document.getElementById('classInput').value.trim().toUpperCase();
     const val = document.getElementById('pinInput').value;
-    if (val === TEACHER_PIN || localStorage.getItem('teacher_auth') === TEACHER_PIN) {
+    if (!cls) { toast('请输入班级代码', true); return; }
+    if (val === TEACHER_PIN) {
+        currentClassCode = cls;
         localStorage.setItem('teacher_auth', TEACHER_PIN);
+        localStorage.setItem('teacher_classCode', cls);
         document.getElementById('pinScreen').classList.add('hidden');
         document.getElementById('dashboard').classList.remove('hidden');
         init();
     } else {
-        toast('密码错误，请重试');
+        toast('密码错误，请重试', true);
         document.getElementById('pinInput').value = '';
     }
 }
@@ -207,9 +215,13 @@ function checkPin() {
 document.getElementById('pinInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') checkPin();
 });
+document.getElementById('classInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('pinInput').focus();
+});
 
 // 自动登录（已验证过）
-if (localStorage.getItem('teacher_auth') === TEACHER_PIN) {
+if (localStorage.getItem('teacher_auth') === TEACHER_PIN && localStorage.getItem('teacher_classCode')) {
+    currentClassCode = localStorage.getItem('teacher_classCode');
     document.getElementById('pinScreen').classList.add('hidden');
     document.getElementById('dashboard').classList.remove('hidden');
     window.addEventListener('load', init);
@@ -217,6 +229,7 @@ if (localStorage.getItem('teacher_auth') === TEACHER_PIN) {
 
 function logout() {
     localStorage.removeItem('teacher_auth');
+    localStorage.removeItem('teacher_classCode');
     location.reload();
 }
 
@@ -224,6 +237,7 @@ function logout() {
 let allLessons = [];
 
 async function init() {
+    document.getElementById('headerClassCode').textContent = currentClassCode;
     await loadLessons();
 }
 
@@ -283,7 +297,7 @@ async function loadLessons() {
     container.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
     try {
         const snap = await db.collection('lessons').get();
-        const attSnap = await db.collection('attempts').get();
+        const attSnap = await db.collection('attempts').where('classCode', '==', currentClassCode).get();
         const attByLesson = {};
         attSnap.docs.forEach(d => {
             const lid = d.data().lessonId;
@@ -537,6 +551,7 @@ async function loadAnalytics() {
         const lesson    = { lessonId, ...lessonDoc.data() };
         const attSnap   = await db.collection('attempts')
             .where('lessonId', '==', lessonId)
+            .where('classCode', '==', currentClassCode)
             .orderBy('startedAt', 'desc').get();
         const attempts  = attSnap.docs.map(d => ({ attemptId: d.id, ...d.data(),
             startedAt:   d.data().startedAt?.toDate?.()?.toISOString() || '',
