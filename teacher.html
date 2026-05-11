@@ -608,19 +608,31 @@ function renderAnalytics(lesson, attempts) {
                         <th class="text-left px-6 py-3 font-bold text-slate-500">学校</th>
                         <th class="text-left px-4 py-3 font-bold text-slate-500">姓名</th>
                         <th class="text-center px-4 py-3 font-bold text-slate-500">总分</th>
+                        <th class="text-center px-4 py-3 font-bold text-slate-500 text-xs">第一关<br><span class="font-normal text-slate-400">认词</span></th>
+                        <th class="text-center px-4 py-3 font-bold text-slate-500 text-xs">第二关<br><span class="font-normal text-slate-400">朗读</span></th>
+                        <th class="text-center px-4 py-3 font-bold text-slate-500 text-xs">游戏<br><span class="font-normal text-slate-400">闯关</span></th>
                         <th class="text-left px-4 py-3 font-bold text-slate-500">完成时间</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${!completed.length
-                        ? `<tr><td colspan="4" class="text-center py-10 text-slate-300">还没有学生完成练习</td></tr>`
-                        : completed.map(a => `
+                        ? `<tr><td colspan="7" class="text-center py-10 text-slate-300">还没有学生完成练习</td></tr>`
+                        : completed.map(a => {
+                            const sc = a.scores || {};
+                            const w  = [0,1,2,3].reduce((s,i) => s + (sc[`word-${i}`]||0), 0);
+                            const p  = [0,1,2].reduce((s,i)   => s + (sc[`para-${i}`]||0), 0);
+                            const g  = (sc['game-img']||0) + (sc['game-audio']||0);
+                            return `
                     <tr class="border-t border-slate-50 hover:bg-slate-50/50">
                         <td class="px-6 py-4 text-slate-500 text-sm">${a.school || '—'}</td>
                         <td class="px-4 py-4 font-bold text-slate-800">${a.studentName}</td>
                         <td class="px-4 py-4 text-center font-black text-blue-600">${a.totalScore ?? '—'}</td>
+                        <td class="px-4 py-4 text-center text-slate-700">${w || '—'}</td>
+                        <td class="px-4 py-4 text-center text-slate-700">${p || '—'}</td>
+                        <td class="px-4 py-4 text-center text-slate-700">${g || '—'}</td>
                         <td class="px-4 py-4 text-slate-400 text-xs">${new Date(a.completedAt).toLocaleString('zh-CN',{hour12:false})}</td>
-                    </tr>`).join('')}
+                    </tr>`;
+                        }).join('')}
                 </tbody>
             </table>
         </div>
@@ -649,15 +661,22 @@ let _exportAttempts = [];
 function downloadCSV() {
     if (!_exportAttempts.length) { toast('没有数据可导出', true); return; }
     const rows = [
-        ['学校', '姓名', '总分', '完成状态', '开始时间', '完成时间'],
-        ..._exportAttempts.map(a => [
-            a.school ?? '',
-            a.studentName,
-            a.totalScore ?? '',
-            a.completedAt ? '完成' : '进行中',
-            a.startedAt   ? new Date(a.startedAt).toLocaleString('zh-CN',{hour12:false}) : '',
-            a.completedAt ? new Date(a.completedAt).toLocaleString('zh-CN',{hour12:false}) : ''
-        ])
+        ['学校', '姓名', '总分', '第一关(认词)', '第二关(朗读)', '游戏闯关', '完成时间'],
+        ..._exportAttempts.map(a => {
+            const sc = a.scores || {};
+            const w  = [0,1,2,3].reduce((s,i) => s + (sc[`word-${i}`]||0), 0);
+            const p  = [0,1,2].reduce((s,i)   => s + (sc[`para-${i}`]||0), 0);
+            const g  = (sc['game-img']||0) + (sc['game-audio']||0);
+            return [
+                a.school ?? '',
+                a.studentName,
+                a.totalScore ?? '',
+                w || '',
+                p || '',
+                g || '',
+                a.completedAt ? new Date(a.completedAt).toLocaleString('zh-CN',{hour12:false}) : ''
+            ];
+        })
     ];
     const bom = '﻿';
     const csv = bom + rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
@@ -674,14 +693,22 @@ function downloadPDF() {
     if (!_exportAttempts.length) { toast('没有数据可导出', true); return; }
     const title    = _exportLesson?.title || '成绩单';
     const date     = new Date().toLocaleDateString('zh-CN');
-    const rows     = _exportAttempts.map(a => `
+    const rows     = _exportAttempts.map(a => {
+        const sc = a.scores || {};
+        const w  = [0,1,2,3].reduce((s,i) => s + (sc[`word-${i}`]||0), 0);
+        const p  = [0,1,2].reduce((s,i)   => s + (sc[`para-${i}`]||0), 0);
+        const g  = (sc['game-img']||0) + (sc['game-audio']||0);
+        return `
         <tr>
             <td style="color:#64748b">${a.school || '—'}</td>
             <td>${a.studentName}</td>
             <td style="text-align:center;font-weight:900;color:#3b82f6">${a.totalScore ?? '—'}</td>
-            <td style="text-align:center">${a.completedAt ? '✅ 完成' : '🔄 进行中'}</td>
-            <td style="color:#94a3b8;font-size:11px">${a.startedAt ? new Date(a.startedAt).toLocaleString('zh-CN',{hour12:false}) : ''}</td>
-        </tr>`).join('');
+            <td style="text-align:center">${w || '—'}</td>
+            <td style="text-align:center">${p || '—'}</td>
+            <td style="text-align:center">${g || '—'}</td>
+            <td style="color:#94a3b8;font-size:11px">${a.completedAt ? new Date(a.completedAt).toLocaleString('zh-CN',{hour12:false}) : ''}</td>
+        </tr>`;
+    }).join('');
 
     const win = window.open('', '_blank');
     win.document.write(`<!DOCTYPE html><html><head>
@@ -702,7 +729,7 @@ function downloadPDF() {
         <p>导出时间：${date} &nbsp;·&nbsp; 共 ${_exportAttempts.length} 人参与</p>
         <button onclick="window.print()" style="margin-bottom:20px;padding:8px 20px;background:#3b82f6;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px">打印 / 存为 PDF</button>
         <table>
-            <thead><tr><th>学校</th><th>姓名</th><th>总分</th><th>完成状态</th><th>时间</th></tr></thead>
+            <thead><tr><th>学校</th><th>姓名</th><th>总分</th><th>第一关(认词)</th><th>第二关(朗读)</th><th>游戏闯关</th><th>完成时间</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
     </body></html>`);
