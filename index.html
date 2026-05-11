@@ -152,7 +152,7 @@
             </button>
             <button id="gameTab-pair" onclick="startGame('pair')"
                 class="flex-1 py-3 rounded-2xl bg-slate-100 text-slate-500 font-black text-sm transition-all hover:bg-slate-200">
-                🔗 词语配对
+                🔊 听读选词
             </button>
         </div>
 
@@ -714,19 +714,20 @@ async function saveAttemptToGAS(completed = false) {
 
 function sendToSheet(total) {
     if (!GAS_URL) return;
+    const wordTotal = currentLesson.words.reduce((s, _, i) => s + (itemScores[`word-${i}`] || 0), 0);
+    const paraTotal = currentParas.reduce((s, _, i) => s + (itemScores[`para-${i}`] || 0), 0);
+    const gameTotal = (itemScores['game-img'] || 0) + (itemScores['game-audio'] || 0);
     fetch(GAS_URL, {
         method:  'POST',
         mode:    'no-cors',
         headers: { 'Content-Type': 'text/plain' },
         body:    JSON.stringify({
-            school,
-            studentName,
+            school, studentName,
             unit:        currentLesson.unit,
             lessonTitle: currentLesson.title,
             totalScore:  total,
             submittedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-            words:       currentLesson.words.map(w => w.word),
-            scores:      itemScores
+            wordTotal, paraTotal, gameTotal
         })
     }).catch(() => {});
 }
@@ -799,7 +800,7 @@ function startGame(type) {
             ? 'flex-1 py-3 rounded-2xl bg-violet-500 text-white font-black text-sm shadow-lg shadow-violet-100 transition-all'
             : 'flex-1 py-3 rounded-2xl bg-slate-100 text-slate-500 font-black text-sm transition-all hover:bg-slate-200';
     });
-    type === 'img' ? initImgGame() : initPairGame();
+    type === 'img' ? initImgGame() : initAudioGame();
 }
 
 // ── 看图选词 ──────────────────────────────────────────────────
@@ -844,25 +845,29 @@ function renderImgRound() {
 
     area.innerHTML = `
     <div class="w-full">
-        <div class="flex justify-between items-center mb-5">
+        <div class="flex justify-between items-center mb-4">
             <span class="text-xs font-bold text-slate-400">第 ${cur+1} / ${total} 题</span>
             <div class="flex gap-1">${dots}</div>
             <span class="text-xs font-bold text-violet-600">${score} 分</span>
         </div>
-        <div class="text-center mb-5">
-            <div class="text-rose-500 font-black text-2xl mb-0.5">${target.pinyin}</div>
-            <div class="hanzi-font text-4xl text-slate-700">${target.word}</div>
+
+        <!-- 大图 -->
+        <div class="rounded-2xl overflow-hidden mb-4 bg-slate-100 flex items-center justify-center" style="height:220px">
+            ${target.imgUrl
+                ? `<img src="${target.imgUrl}" class="w-full h-full object-cover"
+                       onerror="this.parentNode.innerHTML='<span style=\\'font-size:6rem\\'>${target.emoji||'📚'}</span>'">`
+                : `<span style="font-size:6rem">${target.emoji || '📚'}</span>`}
         </div>
+        <p class="text-center text-xs text-slate-400 mb-4">这是哪个词语？</p>
+
+        <!-- 词语选项（汉字，不显示拼音） -->
         <div class="grid grid-cols-2 gap-3">
             ${opts.map(idx => {
                 const w = words[idx];
                 return `<button onclick="answerImg(this,${idx},${targetIdx})"
-                    class="game-opt rounded-2xl overflow-hidden border-2 border-slate-100 hover:border-violet-300 transition-all bg-slate-50">
-                    <div class="h-28 flex items-center justify-center overflow-hidden">
-                        ${w.imgUrl
-                            ? `<img src="${w.imgUrl}" class="w-full h-full object-cover" onerror="this.parentNode.innerHTML='<span class=\\'text-5xl\\'>${w.emoji||'📚'}</span>'">`
-                            : `<span class="text-5xl">${w.emoji || '📚'}</span>`}
-                    </div>
+                    class="game-opt rounded-2xl border-2 border-slate-100 hover:border-violet-300
+                           transition-all bg-white py-5 text-center">
+                    <span class="hanzi-font text-3xl text-slate-800">${w.word}</span>
                 </button>`;
             }).join('')}
         </div>
@@ -882,96 +887,92 @@ function answerImg(btn, selected, correct) {
     setTimeout(() => { gs.img.cur++; renderImgRound(); }, 900);
 }
 
-// ── 词语配对 ──────────────────────────────────────────────────
-function initPairGame() {
+// ── 听读选词 ──────────────────────────────────────────────────
+function initAudioGame() {
     const words = currentLesson?.words;
     if (!words?.length) return;
-    gs.pair = {
-        pinyinOrder: shuffle(words.map((_, i) => i)),
-        selected: null,
-        matched: new Set(),
-        wrongs: 0
-    };
-    renderPairGame();
+    gs.audio = { order: shuffle(words.map((_, i) => i)), cur: 0, score: 0 };
+    renderAudioRound();
 }
 
-function renderPairGame() {
-    const { pinyinOrder, selected, matched } = gs.pair;
-    const words  = currentLesson.words;
-    const area   = document.getElementById('gameArea');
+function renderAudioRound() {
+    const { order, cur, score } = gs.audio;
+    const words = currentLesson.words;
+    const area  = document.getElementById('gameArea');
+    const total = order.length;
 
-    if (matched.size === words.length) {
-        const score = Math.max(0, 100 - gs.pair.wrongs * 10);
+    if (cur >= total) {
+        const pct = Math.round(score / total * 100);
         area.innerHTML = `
         <div class="text-center py-6 w-full">
-            <div class="text-6xl mb-3">🎉</div>
-            <div class="text-3xl font-black text-violet-600 mb-1">${score} 分</div>
-            <div class="text-slate-400 mb-2">错误 ${gs.pair.wrongs} 次</div>
-            <div class="text-slate-400 mb-6">配对完成！</div>
-            <button onclick="initPairGame()"
+            <div class="text-6xl mb-3">${pct >= 75 ? '🎉' : pct >= 50 ? '😊' : '💪'}</div>
+            <div class="text-3xl font-black text-violet-600 mb-1">${score} / ${total}</div>
+            <div class="text-slate-400 mb-6">听读选词完成！</div>
+            <button onclick="initAudioGame()"
                 class="px-8 py-3 bg-violet-500 text-white rounded-2xl font-black hover:bg-violet-600 transition-all">
                 再来一次
             </button>
         </div>`;
-        updateItemScore('game-pair', score);
+        updateItemScore('game-audio', pct);
         saveAttemptToGAS();
         checkAllDone();
         return;
     }
 
-    const cell = (type, idx, label, extra = '') => {
-        const done  = matched.has(idx);
-        const isSel = selected?.type === type && selected?.idx === idx;
-        const cls   = done  ? 'bg-green-50 border-green-300 text-green-600 cursor-default' :
-                      isSel ? 'bg-violet-500 border-violet-500 text-white shadow-lg scale-105' :
-                              'bg-white border-slate-200 text-slate-800 hover:border-violet-300';
-        return `<button onclick="${done ? '' : `selectPair('${type}',${idx})`}"
-            class="w-full py-4 px-3 rounded-2xl border-2 font-black text-center transition-all text-sm ${cls} ${extra}">
-            ${label}
-        </button>`;
-    };
+    const targetIdx = order[cur];
+    const target    = words[targetIdx];
+    const others    = shuffle(words.map((_, i) => i).filter(i => i !== targetIdx)).slice(0, 3);
+    const opts      = shuffle([targetIdx, ...others]);
+    const dots      = Array.from({ length: total }, (_, i) =>
+        `<div class="w-2 h-2 rounded-full ${i < cur ? 'bg-violet-400' : i === cur ? 'bg-violet-600' : 'bg-slate-200'}"></div>`
+    ).join('');
 
     area.innerHTML = `
     <div class="w-full">
-        <div class="text-xs font-bold text-slate-400 mb-4 text-center">点击词语，再点击对应的拼音来配对</div>
-        <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-3">
-                ${words.map((w, i) => cell('word', i, `<span class="hanzi-font text-2xl">${w.word}</span>`)).join('')}
-            </div>
-            <div class="space-y-3">
-                ${pinyinOrder.map(wi => cell('pinyin', wi, `<span class="text-rose-500">${words[wi].pinyin}</span>`)).join('')}
-            </div>
+        <div class="flex justify-between items-center mb-4">
+            <span class="text-xs font-bold text-slate-400">第 ${cur+1} / ${total} 题</span>
+            <div class="flex gap-1">${dots}</div>
+            <span class="text-xs font-bold text-violet-600">${score} 分</span>
         </div>
-        <div class="text-center mt-4 text-xs font-bold text-slate-300">已配对 ${matched.size} / ${words.length}</div>
+
+        <!-- 播放按钮 -->
+        <div class="flex flex-col items-center mb-6 py-4">
+            <button onclick="speak('${target.word}')"
+                class="w-28 h-28 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-600
+                       flex items-center justify-center transition-all shadow-lg shadow-violet-100 mb-3">
+                <i class="fas fa-volume-up text-5xl"></i>
+            </button>
+            <p class="text-xs text-slate-400">点击播放，选出你听到的词语</p>
+        </div>
+
+        <!-- 词语选项（汉字，不给拼音提示） -->
+        <div class="grid grid-cols-2 gap-3">
+            ${opts.map(idx => {
+                const w = words[idx];
+                return `<button onclick="answerAudio(this,${idx},${targetIdx})"
+                    class="game-opt rounded-2xl border-2 border-slate-100 hover:border-violet-300
+                           transition-all bg-white py-5 text-center">
+                    <span class="hanzi-font text-3xl text-slate-800">${w.word}</span>
+                </button>`;
+            }).join('')}
+        </div>
     </div>`;
+
+    // 进入题目自动播放
+    setTimeout(() => speak(target.word), 300);
 }
 
-function selectPair(type, idx) {
-    const { selected, matched } = gs.pair;
-    if (matched.has(idx)) return;
-
-    if (!selected) {
-        gs.pair.selected = { type, idx };
-        renderPairGame();
-        return;
-    }
-    if (selected.type === type) {
-        gs.pair.selected = { type, idx };
-        renderPairGame();
-        return;
-    }
-
-    const wordIdx   = type === 'word'   ? idx : selected.idx;
-    const pinyinIdx = type === 'pinyin' ? idx : selected.idx;
-
-    gs.pair.selected = null;
-    if (wordIdx === pinyinIdx) {
-        gs.pair.matched.add(wordIdx);
+function answerAudio(btn, selected, correct) {
+    document.querySelectorAll('.game-opt').forEach(b => { b.onclick = null; b.style.pointerEvents = 'none'; });
+    if (selected === correct) {
+        gs.audio.score++;
+        btn.classList.add('border-green-400', 'bg-green-50');
+        btn.innerHTML += '<div class="text-green-500 font-black text-center text-sm mt-2">✓ 正确！</div>';
     } else {
-        gs.pair.wrongs++;
-        showMsg('再想想 💭');
+        btn.classList.add('border-red-400', 'bg-red-50');
+        btn.innerHTML += '<div class="text-red-400 font-bold text-center text-sm mt-2">✗ 再想想</div>';
     }
-    renderPairGame();
+    setTimeout(() => { gs.audio.cur++; renderAudioRound(); }, 900);
 }
 
 function showMsg(msg) {
