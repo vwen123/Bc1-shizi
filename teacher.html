@@ -729,10 +729,12 @@ async function loadProgressBoard() {
 
         // 每位学生每课的最佳状态
         const statusMap = {};   // studentName → lessonId → 'done'|'partial'
+        const schoolMap = {};   // studentName → school
         for (const a of attempts) {
             const s = a.studentName; const l = a.lessonId;
             if (!s || !l) continue;
             if (!statusMap[s]) statusMap[s] = {};
+            if (a.school && !schoolMap[s]) schoolMap[s] = a.school;
             if (a.completedAt) statusMap[s][l] = 'done';
             else if (!statusMap[s][l]) statusMap[s][l] = 'partial';
         }
@@ -767,7 +769,10 @@ async function loadProgressBoard() {
                 <tbody>
                     ${students.map((student, si) => `
                     <tr class="${si % 2 === 0 ? '' : 'bg-slate-50/50'} hover:bg-blue-50/30 transition-colors">
-                        <td class="px-5 py-3 font-bold text-slate-700 sticky left-0 ${si % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} border-b border-slate-50">${student}</td>
+                        <td class="px-5 py-3 sticky left-0 ${si % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} border-b border-slate-50">
+                            <div class="font-bold text-slate-700">${student}</div>
+                            ${schoolMap[student] ? `<div class="text-xs text-slate-400 mt-0.5">${schoolMap[student]}</div>` : ''}
+                        </td>
                         ${lessons.map(l => {
                             const st = statusMap[student]?.[l.lessonId];
                             return `<td class="px-4 py-3 text-center text-xl border-b border-slate-50">${
