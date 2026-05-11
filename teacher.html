@@ -30,16 +30,14 @@
     <div class="bg-white rounded-3xl shadow-xl p-10 w-full max-w-sm text-center">
         <div class="text-5xl mb-4">🔐</div>
         <h1 class="text-2xl font-black text-slate-800 mb-1">老师控制台</h1>
-        <p class="text-slate-400 text-sm mb-8">请输入班级代码和教师密码</p>
-        <input id="classInput" type="text" placeholder="班级代码（如 YANI1A）" maxlength="10"
-            class="w-full text-center text-xl p-4 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-400 mb-3 uppercase tracking-widest">
+        <p class="text-slate-400 text-sm mb-8">请输入教师密码</p>
         <input id="pinInput" type="password" placeholder="密码" maxlength="8"
             class="w-full text-center text-2xl p-4 border-2 border-slate-100 rounded-2xl focus:outline-none focus:border-blue-400 mb-4 tracking-widest">
         <button onclick="checkPin()"
             class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black text-lg transition-all">
             进入
         </button>
-        <p class="text-xs text-slate-300 mt-4">默认密码：8888</p>
+        <p class="text-xs text-slate-300 mt-4">默认密码：8888（可在代码中修改）</p>
     </div>
 </div>
 
@@ -52,7 +50,7 @@
             <span class="text-2xl">🌟</span>
             <div>
                 <h1 class="font-black text-slate-800 leading-tight">小状元识字</h1>
-                <p class="text-[10px] text-slate-400 uppercase tracking-widest">老师控制台 · <span id="headerClassCode" class="text-blue-500 font-black"></span></p>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest">老师控制台</p>
             </div>
         </div>
         <div class="flex items-center gap-3">
@@ -87,9 +85,6 @@
             </button>
             <button class="tab-btn px-6 py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-all" onclick="switchTab('analytics', this)">
                 <i class="fas fa-chart-bar mr-2"></i>学生数据
-            </button>
-            <button class="tab-btn px-6 py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-all" onclick="switchTab('overview', this)">
-                <i class="fas fa-globe mr-2"></i>总览
             </button>
         </div>
 
@@ -159,13 +154,6 @@
             </div>
         </div>
 
-        <!-- ══ 总览 ══ -->
-        <div id="tab-overview" class="hidden">
-            <div id="overviewContent">
-                <div class="text-center text-slate-400 py-10">加载中...</div>
-            </div>
-        </div>
-
         <!-- ══ 学生数据 ══ -->
         <div id="tab-analytics" class="hidden">
             <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6">
@@ -200,24 +188,18 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
-const TEACHER_PIN = "8888";
-
-let currentClassCode = '';
+const TEACHER_PIN = "8888"; // 修改此处更改密码
 
 // ── PIN 验证 ──────────────────────────────────────────────────
 function checkPin() {
-    const cls = document.getElementById('classInput').value.trim().toUpperCase();
     const val = document.getElementById('pinInput').value;
-    if (!cls) { toast('请输入班级代码', true); return; }
-    if (val === TEACHER_PIN) {
-        currentClassCode = cls;
+    if (val === TEACHER_PIN || localStorage.getItem('teacher_auth') === TEACHER_PIN) {
         localStorage.setItem('teacher_auth', TEACHER_PIN);
-        localStorage.setItem('teacher_classCode', cls);
         document.getElementById('pinScreen').classList.add('hidden');
         document.getElementById('dashboard').classList.remove('hidden');
         init();
     } else {
-        toast('密码错误，请重试', true);
+        toast('密码错误，请重试');
         document.getElementById('pinInput').value = '';
     }
 }
@@ -225,13 +207,9 @@ function checkPin() {
 document.getElementById('pinInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') checkPin();
 });
-document.getElementById('classInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('pinInput').focus();
-});
 
 // 自动登录（已验证过）
-if (localStorage.getItem('teacher_auth') === TEACHER_PIN && localStorage.getItem('teacher_classCode')) {
-    currentClassCode = localStorage.getItem('teacher_classCode');
+if (localStorage.getItem('teacher_auth') === TEACHER_PIN) {
     document.getElementById('pinScreen').classList.add('hidden');
     document.getElementById('dashboard').classList.remove('hidden');
     window.addEventListener('load', init);
@@ -239,7 +217,6 @@ if (localStorage.getItem('teacher_auth') === TEACHER_PIN && localStorage.getItem
 
 function logout() {
     localStorage.removeItem('teacher_auth');
-    localStorage.removeItem('teacher_classCode');
     location.reload();
 }
 
@@ -247,7 +224,6 @@ function logout() {
 let allLessons = [];
 
 async function init() {
-    document.getElementById('headerClassCode').textContent = currentClassCode;
     await loadLessons();
 }
 
@@ -295,9 +271,8 @@ async function setupLessons() {
 function switchTab(tab, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-500'); });
     btn.classList.add('active'); btn.classList.remove('text-slate-500');
-    ['lessons', 'analytics', 'overview'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
+    ['lessons', 'analytics'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
     if (tab === 'analytics') populateAnalyticsSelect();
-    if (tab === 'overview')  loadOverview();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -308,7 +283,7 @@ async function loadLessons() {
     container.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
     try {
         const snap = await db.collection('lessons').get();
-        const attSnap = await db.collection('attempts').where('classCode', '==', currentClassCode).get();
+        const attSnap = await db.collection('attempts').get();
         const attByLesson = {};
         attSnap.docs.forEach(d => {
             const lid = d.data().lessonId;
@@ -562,7 +537,6 @@ async function loadAnalytics() {
         const lesson    = { lessonId, ...lessonDoc.data() };
         const attSnap   = await db.collection('attempts')
             .where('lessonId', '==', lessonId)
-            .where('classCode', '==', currentClassCode)
             .orderBy('startedAt', 'desc').get();
         const attempts  = attSnap.docs.map(d => ({ attemptId: d.id, ...d.data(),
             startedAt:   d.data().startedAt?.toDate?.()?.toISOString() || '',
@@ -720,109 +694,6 @@ function downloadPDF() {
         </table>
     </body></html>`);
     win.document.close();
-}
-
-// ════════════════════════════════════════════════════════════════
-//  总览
-// ════════════════════════════════════════════════════════════════
-async function loadOverview() {
-    const content = document.getElementById('overviewContent');
-    content.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
-    try {
-        const [classSnap, attSnap] = await Promise.all([
-            db.collection('classes').get(),
-            db.collection('attempts').get()
-        ]);
-
-        const registeredCodes = new Set(classSnap.docs.map(d => d.id));
-        const attempts = attSnap.docs.map(d => ({ ...d.data() }));
-
-        // 按 classCode 汇总
-        const statsMap = {};
-        for (const a of attempts) {
-            const cls = a.classCode || '（无代码）';
-            if (!statsMap[cls]) statsMap[cls] = { students: new Set(), attempts: 0, completed: 0, lastAt: null };
-            statsMap[cls].students.add(a.studentName);
-            statsMap[cls].attempts++;
-            if (a.completedAt) statsMap[cls].completed++;
-            const t = a.startedAt?.toDate?.();
-            if (t && (!statsMap[cls].lastAt || t > statsMap[cls].lastAt)) statsMap[cls].lastAt = t;
-        }
-
-        // 合并已注册但还没学生的班级
-        for (const code of registeredCodes) {
-            if (!statsMap[code]) statsMap[code] = { students: new Set(), attempts: 0, completed: 0, lastAt: null };
-        }
-
-        const rows = Object.entries(statsMap).map(([code, s]) => ({
-            code,
-            registered: registeredCodes.has(code),
-            students:   s.students.size,
-            attempts:   s.attempts,
-            completed:  s.completed,
-            lastAt:     s.lastAt
-        })).sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
-
-        // 全站汇总
-        const totalStudents  = new Set(attempts.filter(a => a.classCode).map(a => a.studentName + '@' + a.classCode)).size;
-        const totalAttempts  = attempts.length;
-        const totalCompleted = attempts.filter(a => a.completedAt).length;
-
-        const fmt = d => d ? d.toLocaleDateString('zh-CN', { month:'numeric', day:'numeric' }) : '—';
-
-        content.innerHTML = `
-        <!-- 全站统计卡 -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-            ${[
-                ['🏫', rows.length,      '班级总数',   'blue'],
-                ['👦', totalStudents,    '学生总数',   'purple'],
-                ['📝', totalAttempts,    '总练习次数', 'amber'],
-                ['✅', totalCompleted,   '总完成次数', 'green'],
-            ].map(([icon, val, label, c]) => `
-            <div class="bg-white rounded-2xl p-5 text-center shadow-sm border border-${c}-100">
-                <div class="text-2xl mb-1">${icon}</div>
-                <div class="text-3xl font-black text-${c}-600 mb-1">${val}</div>
-                <div class="text-xs font-bold text-${c}-400">${label}</div>
-            </div>`).join('')}
-        </div>
-
-        <!-- 班级明细 -->
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
-                <span class="font-black text-slate-700">班级明细</span>
-                <span class="text-xs text-slate-400">${rows.length} 个班级</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                            <th class="text-left px-6 py-3 font-bold text-slate-500">班级代码</th>
-                            <th class="text-center px-4 py-3 font-bold text-slate-500">学生</th>
-                            <th class="text-center px-4 py-3 font-bold text-slate-500">练习</th>
-                            <th class="text-center px-4 py-3 font-bold text-slate-500">完成</th>
-                            <th class="text-center px-4 py-3 font-bold text-slate-500">最近活跃</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows.length ? rows.map(r => `
-                        <tr class="border-t border-slate-50 hover:bg-slate-50/50">
-                            <td class="px-6 py-4">
-                                <span class="font-black text-slate-800">${r.code}</span>
-                                ${r.registered ? '<span class="ml-2 text-[10px] bg-purple-50 text-purple-500 font-bold px-2 py-0.5 rounded-full">已注册</span>' : ''}
-                            </td>
-                            <td class="px-4 py-4 text-center font-bold text-slate-700">${r.students}</td>
-                            <td class="px-4 py-4 text-center font-bold text-blue-600">${r.attempts}</td>
-                            <td class="px-4 py-4 text-center font-bold text-green-600">${r.completed}</td>
-                            <td class="px-4 py-4 text-center text-slate-400 text-xs">${fmt(r.lastAt)}</td>
-                        </tr>`).join('') : `
-                        <tr><td colspan="5" class="text-center py-10 text-slate-300">还没有任何班级数据</td></tr>`}
-                    </tbody>
-                </table>
-            </div>
-        </div>`;
-    } catch(e) {
-        content.innerHTML = `<div class="text-red-400 text-center py-10">加载失败：${e.message}</div>`;
-    }
 }
 
 // ── 工具 ──────────────────────────────────────────────────────

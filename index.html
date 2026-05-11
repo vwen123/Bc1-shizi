@@ -67,14 +67,9 @@
         <h1 class="text-4xl font-black text-blue-600 mb-2 tracking-tight">小状元识字</h1>
         <p class="text-slate-400 mb-8 font-medium">像状元一样快乐读书</p>
 
-        <div class="text-left mb-4">
-            <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">班级代码</label>
-            <input id="inputClass" type="text" placeholder="例：YANI1A"
-                   class="w-full px-6 py-4 border-2 border-slate-100 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/50 uppercase">
-        </div>
         <div class="text-left mb-6">
-            <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">输入你的代号</label>
-            <input id="inputName" type="text" placeholder="输入你的代号..."
+            <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">输入你的名字</label>
+            <input id="inputName" type="text" placeholder="大名鼎鼎的小状元..."
                    class="w-full px-6 py-4 border-2 border-slate-100 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/50">
         </div>
 
@@ -86,17 +81,6 @@
                     加载课程中...
                 </div>
             </div>
-        </div>
-
-        <div class="mt-5 pt-4 border-t border-slate-100 space-y-2">
-            <button onclick="openLeaderboard()"
-                class="w-full py-3 rounded-2xl bg-amber-50 text-amber-600 font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2 text-sm">
-                🏆 查看班级排行榜
-            </button>
-            <button onclick="openTeacherMode()"
-                class="w-full py-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 font-bold transition-all flex items-center justify-center gap-2 text-xs">
-                <i class="fas fa-chalkboard-teacher"></i> 教师入口
-            </button>
         </div>
     </div>
 </div>
@@ -180,151 +164,9 @@
             <div class="text-sm font-bold text-blue-600 uppercase mb-1">状元总得分</div>
             <div id="rewardScore" class="text-5xl font-black text-blue-600">0</div>
         </div>
-        <button onclick="openLeaderboard()"
-            class="w-full bg-amber-500 hover:bg-amber-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl mb-3">
-            🏆 查看班级排行榜
-        </button>
         <button onclick="goHome()" class="w-full bg-slate-800 hover:bg-black text-white py-5 rounded-2xl font-black text-lg shadow-xl">
             返回首页
         </button>
-    </div>
-</div>
-
-<!-- ════════════ 界面四：教师专区 ════════════ -->
-<div id="screenTeacher" class="hidden max-w-md mx-auto px-6 py-12">
-    <div class="bg-white rounded-[2.5rem] shadow-2xl border-b-8 border-purple-600 p-8">
-
-        <!-- 顶部 -->
-        <div class="flex items-center justify-between mb-6">
-            <button onclick="goHome()" class="w-9 h-9 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-all">
-                <i class="fas fa-arrow-left text-sm"></i>
-            </button>
-            <div class="text-center">
-                <div class="text-2xl font-black text-purple-600">教师专区</div>
-                <div id="teacherClassLabel" class="text-xs text-slate-400 font-bold"></div>
-            </div>
-            <button id="teacherLogoutBtn" onclick="teacherLogout()" class="hidden text-xs text-slate-400 hover:text-slate-600 font-bold px-3 py-2 rounded-xl hover:bg-slate-100 transition-all">
-                退出
-            </button>
-            <div id="teacherLogoutPlaceholder" class="w-9"></div>
-        </div>
-
-        <!-- ── 登录 / 注册面板 ── -->
-        <div id="teacherAuthPanel">
-            <!-- 标签 -->
-            <div class="flex bg-slate-100 rounded-2xl p-1 mb-6">
-                <button id="tabCreate" onclick="switchTeacherTab('create')"
-                    class="flex-1 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-purple-600 shadow-sm">
-                    创建班级
-                </button>
-                <button id="tabLogin" onclick="switchTeacherTab('login')"
-                    class="flex-1 py-2.5 rounded-xl text-sm font-black transition-all text-slate-400">
-                    进入班级
-                </button>
-            </div>
-
-            <!-- 创建班级 -->
-            <div id="teacherCreateForm" class="space-y-3">
-                <input id="tcClassCode" type="text" placeholder="设定班级代码（如 SMKB1A）" maxlength="12"
-                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg uppercase focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 font-bold tracking-wider">
-                <input id="tcPin" type="password" placeholder="设定教师密码（4-8位）" maxlength="8"
-                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 tracking-widest">
-                <input id="tcPinConfirm" type="password" placeholder="再输一次确认" maxlength="8"
-                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 tracking-widest">
-                <button onclick="createClass()"
-                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-black text-lg transition-all shadow-lg shadow-purple-100">
-                    创建班级
-                </button>
-                <p class="text-xs text-slate-300 text-center">创建后把班级代码告知学生即可</p>
-            </div>
-
-            <!-- 进入班级 -->
-            <div id="teacherLoginForm" class="space-y-3 hidden">
-                <input id="tlClassCode" type="text" placeholder="班级代码" maxlength="12"
-                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg uppercase focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 font-bold tracking-wider">
-                <input id="tlPin" type="password" placeholder="教师密码" maxlength="8"
-                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 tracking-widest">
-                <button onclick="teacherLogin()"
-                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-black text-lg transition-all shadow-lg shadow-purple-100">
-                    进入
-                </button>
-            </div>
-        </div>
-
-        <!-- ── 班级数据面板（登录后） ── -->
-        <div id="teacherDataPanel" class="hidden">
-            <div class="flex items-center gap-3 mb-5">
-                <label class="text-sm font-bold text-slate-500 shrink-0">课题：</label>
-                <select id="teacherLessonSelect" onchange="loadTeacherAnalytics()"
-                    class="flex-1 p-3 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-purple-400 font-bold">
-                    <option value="">— 请选择 —</option>
-                </select>
-            </div>
-
-            <div id="teacherAnalyticsContent">
-                <div class="text-center text-slate-300 py-10 text-sm">请选择课题查看数据</div>
-            </div>
-        </div>
-
-    </div>
-</div>
-
-<!-- ════════════ 界面五：排行榜 ════════════ -->
-<div id="screenLeaderboard" class="hidden max-w-2xl mx-auto px-4 py-8">
-
-    <!-- 顶部导航 -->
-    <div class="sticky top-4 z-40 bg-white/80 backdrop-blur-md rounded-3xl shadow-lg p-4 mb-8 flex items-center justify-between border border-white">
-        <button onclick="goHome()" class="flex items-center gap-2 px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-2xl transition-all">
-            <i class="fas fa-home"></i> 首页
-        </button>
-        <div class="text-center">
-            <h2 class="text-xl font-black text-slate-800">🏆 班级排行榜</h2>
-            <div id="lbClassBadge" class="text-[10px] uppercase tracking-widest text-amber-500 font-bold"></div>
-        </div>
-        <button onclick="reloadLeaderboard()" class="flex items-center gap-2 px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-2xl transition-all">
-            <i class="fas fa-sync-alt"></i>
-        </button>
-    </div>
-
-    <!-- 班级代码输入（未登录时） -->
-    <div id="lbInputSection" class="hidden mb-6">
-        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <label class="text-sm font-bold text-slate-500 mb-2 block">输入班级代码查看排行</label>
-            <div class="flex gap-3">
-                <input id="lbClassInput" type="text" placeholder="例：YANI1A"
-                    class="flex-1 px-4 py-3 border-2 border-slate-100 rounded-xl text-center uppercase focus:outline-none focus:border-amber-400 text-lg">
-                <button onclick="loadLeaderboard(document.getElementById('lbClassInput').value.trim().toUpperCase())"
-                    class="px-5 py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all">
-                    查看
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 课题筛选 -->
-    <div id="lbFilterSection" class="hidden bg-white rounded-2xl shadow-sm p-4 mb-6 flex items-center gap-3">
-        <label class="text-sm font-bold text-slate-500 shrink-0"><i class="fas fa-filter mr-1"></i>课题：</label>
-        <select id="lbLessonFilter" onchange="renderLeaderboard()"
-            class="flex-1 p-2.5 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-amber-400 font-bold">
-            <option value="">全部课题</option>
-        </select>
-    </div>
-
-    <!-- 加载中 -->
-    <div id="lbLoading" class="hidden text-center py-16 text-slate-400">
-        <div class="w-8 h-8 border-4 border-amber-300 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        加载排行榜...
-    </div>
-
-    <!-- 排行内容 -->
-    <div id="lbContent" class="hidden">
-        <div id="lbPodium" class="flex items-end justify-center gap-3 mb-8 px-2 min-h-[200px]"></div>
-        <div id="lbList" class="space-y-3 mb-6"></div>
-        <div id="lbEmpty" class="hidden text-center py-16">
-            <div class="text-5xl mb-3">📝</div>
-            <div class="font-black text-slate-400">还没有同学练习</div>
-        </div>
-        <div id="lbStats" class="bg-white rounded-2xl p-4 text-center text-xs text-slate-400 font-bold"></div>
     </div>
 </div>
 
@@ -349,23 +191,20 @@ let allLessons    = [];
 let currentLesson = null;
 let currentParas  = [];
 let studentName   = '';
-let classCode     = '';
 let itemScores    = {};
 let totalItems    = 0;
 let currentAttemptId = null;
 let activeQuizWriter = null;
 let activeQuizId     = null;
-let _rec             = null;
-let _recId           = null;
+let _rec             = null;   // 当前录音实例
+let _recId           = null;   // 当前录音的 id
 
 // ════════════════════════════════════════
 //  初始化 — 从 Firestore 加载课程
 // ════════════════════════════════════════
 window.onload = async () => {
-    const savedName  = localStorage.getItem('shizi_studentName');
-    const savedClass = localStorage.getItem('shizi_classCode');
-    if (savedName)  document.getElementById('inputName').value  = savedName;
-    if (savedClass) document.getElementById('inputClass').value = savedClass;
+    const saved = localStorage.getItem('shizi_studentName');
+    if (saved) document.getElementById('inputName').value = saved;
 
     try {
         const snap = await db.collection('lessons').get();
@@ -412,11 +251,8 @@ function renderLessonMenu() {
 //  开始课程
 // ════════════════════════════════════════
 function startLesson(idx) {
-    classCode   = document.getElementById('inputClass').value.trim().toUpperCase();
     studentName = document.getElementById('inputName').value.trim();
-    if (!classCode)   { showMsg('请输入班级代码！'); return; }
-    if (!studentName) { showMsg('状元公，请先赐代号哦！'); return; }
-    localStorage.setItem('shizi_classCode',   classCode);
+    if (!studentName) { showMsg('状元公，请先赐名哦！'); return; }
     localStorage.setItem('shizi_studentName', studentName);
 
     currentLesson    = allLessons[idx];
@@ -804,7 +640,6 @@ async function saveAttemptToGAS(completed = false) {
                 lessonId:    currentLesson.lessonId,
                 lessonTitle: currentLesson.title,
                 unit:        currentLesson.unit,
-                classCode,
                 studentName,
                 scores:      itemScores,
                 totalScore:  total,
@@ -838,7 +673,7 @@ function launchConfetti() {
 }
 
 function showScreen(id) {
-    ['screenStart','screenLearn','screenReward','screenTeacher','screenLeaderboard'].forEach(s =>
+    ['screenStart','screenLearn','screenReward'].forEach(s =>
         document.getElementById(s).classList.toggle('hidden', s !== id)
     );
 }
@@ -847,284 +682,6 @@ function goHome() {
     window.speechSynthesis.cancel();
     currentAttemptId = null;
     showScreen('screenStart');
-}
-
-// ════════════════════════════════════════
-//  教师专区
-// ════════════════════════════════════════
-let teacherClassCode = '';
-let teacherAttempts  = [];
-
-function openTeacherMode() {
-    showScreen('screenTeacher');
-    document.getElementById('teacherAuthPanel').classList.remove('hidden');
-    document.getElementById('teacherDataPanel').classList.add('hidden');
-    document.getElementById('teacherLogoutBtn').classList.add('hidden');
-    document.getElementById('teacherLogoutPlaceholder').classList.remove('hidden');
-    document.getElementById('teacherClassLabel').textContent = '';
-    switchTeacherTab('create');
-}
-
-function switchTeacherTab(tab) {
-    const isCreate = tab === 'create';
-    document.getElementById('teacherCreateForm').classList.toggle('hidden', !isCreate);
-    document.getElementById('teacherLoginForm').classList.toggle('hidden', isCreate);
-    const activeClass   = 'bg-white text-purple-600 shadow-sm';
-    const inactiveClass = 'text-slate-400';
-    document.getElementById('tabCreate').className = `flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${isCreate ? activeClass : inactiveClass}`;
-    document.getElementById('tabLogin').className  = `flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${isCreate ? inactiveClass : activeClass}`;
-}
-
-async function createClass() {
-    const cls  = document.getElementById('tcClassCode').value.trim().toUpperCase();
-    const pin  = document.getElementById('tcPin').value;
-    const pin2 = document.getElementById('tcPinConfirm').value;
-    if (!cls)        { showMsg('请输入班级代码'); return; }
-    if (pin.length < 4) { showMsg('密码至少 4 位'); return; }
-    if (pin !== pin2)   { showMsg('两次密码不一致'); return; }
-    try {
-        const doc = await db.collection('classes').doc(cls).get();
-        if (doc.exists) { showMsg('此班级代码已被使用，换一个试试'); return; }
-        await db.collection('classes').doc(cls).set({
-            pin, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        showMsg(`班级 ${cls} 创建成功！`);
-        document.getElementById('tcClassCode').value = '';
-        document.getElementById('tcPin').value = '';
-        document.getElementById('tcPinConfirm').value = '';
-        teacherClassCode = cls;
-        enterTeacherDashboard(cls);
-    } catch(e) { showMsg('创建失败：' + e.message); }
-}
-
-async function teacherLogin() {
-    const cls = document.getElementById('tlClassCode').value.trim().toUpperCase();
-    const pin = document.getElementById('tlPin').value;
-    if (!cls || !pin) { showMsg('请填写班级代码和密码'); return; }
-    try {
-        const doc = await db.collection('classes').doc(cls).get();
-        if (!doc.exists)          { showMsg('找不到此班级，请先创建'); return; }
-        if (doc.data().pin !== pin) { showMsg('密码错误');              return; }
-        teacherClassCode = cls;
-        enterTeacherDashboard(cls);
-    } catch(e) { showMsg('登录失败：' + e.message); }
-}
-
-async function enterTeacherDashboard(cls) {
-    document.getElementById('teacherAuthPanel').classList.add('hidden');
-    document.getElementById('teacherDataPanel').classList.remove('hidden');
-    document.getElementById('teacherLogoutBtn').classList.remove('hidden');
-    document.getElementById('teacherLogoutPlaceholder').classList.add('hidden');
-    document.getElementById('teacherClassLabel').textContent = cls + ' 班';
-
-    // 填充课题下拉
-    const sel = document.getElementById('teacherLessonSelect');
-    sel.innerHTML = '<option value="">— 请选择 —</option>' +
-        allLessons.map(l => `<option value="${l.lessonId}">${l.title}</option>`).join('');
-
-    // 预载全班 attempts
-    const snap = await db.collection('attempts').where('classCode', '==', cls).get();
-    teacherAttempts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-}
-
-async function loadTeacherAnalytics() {
-    const lessonId = document.getElementById('teacherLessonSelect').value;
-    const content  = document.getElementById('teacherAnalyticsContent');
-    if (!lessonId) {
-        content.innerHTML = '<div class="text-center text-slate-300 py-10 text-sm">请选择课题查看数据</div>';
-        return;
-    }
-    const attempts = teacherAttempts
-        .filter(a => a.lessonId === lessonId)
-        .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
-
-    const completed = attempts.filter(a => a.completedAt);
-    const avg = completed.length
-        ? Math.round(completed.reduce((s, a) => s + (a.totalScore || 0), 0) / completed.length) : 0;
-
-    content.innerHTML = `
-    <div class="grid grid-cols-3 gap-2 mb-5">
-        ${[['参与', attempts.length, 'blue'], ['完成', completed.length, 'green'], ['平均分', avg, 'amber']]
-            .map(([l, v, c]) => `
-        <div class="bg-${c}-50 rounded-2xl p-3 text-center border border-${c}-100">
-            <div class="text-xl font-black text-${c}-600">${v}</div>
-            <div class="text-[10px] font-bold text-${c}-400">${l}</div>
-        </div>`).join('')}
-    </div>
-    ${attempts.length ? `
-    <div class="overflow-x-auto rounded-2xl border border-slate-100 mb-4">
-        <table class="w-full text-sm">
-            <thead class="bg-slate-50">
-                <tr>
-                    <th class="text-left px-4 py-2.5 font-bold text-slate-500 text-xs">代号</th>
-                    <th class="text-center px-3 py-2.5 font-bold text-slate-500 text-xs">总分</th>
-                    <th class="text-center px-3 py-2.5 font-bold text-slate-500 text-xs">完成</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${attempts.map(a => `
-                <tr class="border-t border-slate-50">
-                    <td class="px-4 py-3 font-bold text-slate-700">${a.studentName}</td>
-                    <td class="px-3 py-3 text-center font-black text-blue-600">${a.totalScore ?? '—'}</td>
-                    <td class="px-3 py-3 text-center text-lg">${a.completedAt ? '✅' : '🔄'}</td>
-                </tr>`).join('')}
-            </tbody>
-        </table>
-    </div>
-    <button onclick="downloadTeacherCSV()"
-        class="w-full py-3 rounded-2xl bg-emerald-50 text-emerald-600 font-black hover:bg-emerald-100 transition-all text-sm flex items-center justify-center gap-2">
-        <i class="fas fa-file-csv"></i> 下载 CSV
-    </button>` : '<div class="text-center text-slate-300 py-8 text-sm">这课还没有学生练习</div>'}`;
-}
-
-function downloadTeacherCSV() {
-    const lessonId = document.getElementById('teacherLessonSelect').value;
-    const lessonTitle = allLessons.find(l => l.lessonId === lessonId)?.title || '成绩单';
-    const attempts = teacherAttempts.filter(a => a.lessonId === lessonId)
-        .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
-    if (!attempts.length) { showMsg('没有数据可导出'); return; }
-    const rows = [
-        ['代号', '总分', '完成状态', '时间'],
-        ...attempts.map(a => [
-            a.studentName, a.totalScore ?? '',
-            a.completedAt ? '完成' : '进行中',
-            a.startedAt?.toDate?.()?.toLocaleString('zh-CN', { hour12: false }) || ''
-        ])
-    ];
-    const csv  = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `${lessonTitle}_${teacherClassCode}.csv`; a.click();
-    URL.revokeObjectURL(url);
-}
-
-function teacherLogout() {
-    teacherClassCode = '';
-    teacherAttempts  = [];
-    openTeacherMode();
-}
-
-// ════════════════════════════════════════
-//  排行榜
-// ════════════════════════════════════════
-let lbAttempts = [];
-
-function openLeaderboard() {
-    const cls = classCode || localStorage.getItem('shizi_classCode') || '';
-    document.getElementById('lbClassBadge').textContent = cls || '';
-    showScreen('screenLeaderboard');
-
-    // 填充课题筛选
-    const sel = document.getElementById('lbLessonFilter');
-    sel.innerHTML = '<option value="">全部课题</option>' +
-        allLessons.map(l => `<option value="${l.lessonId}">${l.title}</option>`).join('');
-
-    if (cls) {
-        document.getElementById('lbInputSection').classList.add('hidden');
-        document.getElementById('lbFilterSection').classList.remove('hidden');
-        loadLeaderboard(cls);
-    } else {
-        document.getElementById('lbInputSection').classList.remove('hidden');
-        document.getElementById('lbFilterSection').classList.add('hidden');
-        document.getElementById('lbLoading').classList.add('hidden');
-        document.getElementById('lbContent').classList.add('hidden');
-    }
-}
-
-async function loadLeaderboard(cls) {
-    if (!cls) return;
-    document.getElementById('lbClassBadge').textContent = cls;
-    document.getElementById('lbLoading').classList.remove('hidden');
-    document.getElementById('lbContent').classList.add('hidden');
-    try {
-        const snap = await db.collection('attempts').where('classCode', '==', cls).get();
-        lbAttempts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        document.getElementById('lbInputSection').classList.add('hidden');
-        document.getElementById('lbFilterSection').classList.remove('hidden');
-        document.getElementById('lbLoading').classList.add('hidden');
-        document.getElementById('lbContent').classList.remove('hidden');
-        renderLeaderboard();
-    } catch(e) {
-        document.getElementById('lbLoading').innerHTML =
-            `<div class="text-red-400 text-sm">加载失败：${e.message}</div>`;
-    }
-}
-
-function reloadLeaderboard() {
-    const cls = classCode || localStorage.getItem('shizi_classCode') || '';
-    if (cls) loadLeaderboard(cls);
-}
-
-function computeLbRankings(lessonId) {
-    const filtered = lessonId ? lbAttempts.filter(a => a.lessonId === lessonId) : lbAttempts;
-    const map = {};
-    for (const a of filtered) {
-        const name = a.studentName;
-        if (!map[name]) map[name] = { name, lessonBest: {} };
-        const lid = a.lessonId;
-        if (!map[name].lessonBest[lid] || (a.totalScore || 0) > map[name].lessonBest[lid])
-            map[name].lessonBest[lid] = a.totalScore || 0;
-    }
-    for (const s of Object.values(map))
-        s.totalScore = Object.values(s.lessonBest).reduce((a, b) => a + b, 0);
-    return Object.values(map).sort((a, b) => b.totalScore - a.totalScore);
-}
-
-function renderLeaderboard() {
-    const lessonId = document.getElementById('lbLessonFilter').value;
-    const rankings = computeLbRankings(lessonId);
-    const podiumEl = document.getElementById('lbPodium');
-    const listEl   = document.getElementById('lbList');
-    const emptyEl  = document.getElementById('lbEmpty');
-    const statsEl  = document.getElementById('lbStats');
-
-    if (!rankings.length) {
-        podiumEl.innerHTML = '';
-        listEl.innerHTML   = '';
-        emptyEl.classList.remove('hidden');
-        statsEl.textContent = '';
-        return;
-    }
-    emptyEl.classList.add('hidden');
-
-    // 领奖台（前三名）
-    const top3 = rankings.slice(0, Math.min(3, rankings.length));
-    const slots = [
-        { rank:1, bg:'bg-amber-400',  barH:140, medal:'🥇', numColor:'text-amber-800'  },
-        { rank:2, bg:'bg-slate-300',  barH:100, medal:'🥈', numColor:'text-slate-600'  },
-        { rank:3, bg:'bg-orange-400', barH:76,  medal:'🥉', numColor:'text-orange-900' },
-    ];
-    const display = top3.length === 1 ? [slots[0]] :
-                    top3.length === 2 ? [slots[1], slots[0]] :
-                    [slots[1], slots[0], slots[2]];
-
-    podiumEl.innerHTML = display.map(s => {
-        const st = top3[s.rank - 1];
-        if (!st) return '';
-        return `
-        <div class="flex flex-col items-center flex-1 max-w-[150px]">
-            <div class="text-4xl mb-1">${s.medal}</div>
-            <div class="font-black text-slate-800 text-sm mb-0.5 truncate max-w-full px-1 text-center">${st.name}</div>
-            <div class="font-black text-lg text-slate-600 mb-2">${st.totalScore}分</div>
-            <div class="${s.bg} w-full rounded-t-2xl flex items-start justify-center pt-3 shadow-lg"
-                style="height:${s.barH}px">
-                <span class="font-black text-3xl ${s.numColor} opacity-60">${s.rank}</span>
-            </div>
-        </div>`;
-    }).join('');
-
-    // 第4名以后列表
-    listEl.innerHTML = rankings.slice(3).map((s, i) => `
-    <div class="bg-white rounded-2xl px-5 py-4 flex items-center gap-4 shadow-sm border border-slate-100">
-        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-black text-slate-400 text-lg shrink-0">${i + 4}</div>
-        <div class="flex-1 font-bold text-slate-800 truncate">${s.name}</div>
-        <div class="font-black text-blue-600 text-lg shrink-0">${s.totalScore}<span class="text-xs font-normal text-slate-400 ml-0.5">分</span></div>
-    </div>`).join('');
-
-    // 底部统计
-    const avg = Math.round(rankings.reduce((a, b) => a + b.totalScore, 0) / rankings.length);
-    statsEl.innerHTML = `共 ${rankings.length} 位同学 &nbsp;·&nbsp; 最高分 ${rankings[0].totalScore} &nbsp;·&nbsp; 平均分 ${avg}`;
 }
 
 function showMsg(msg) {
