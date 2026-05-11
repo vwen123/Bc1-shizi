@@ -88,6 +88,9 @@
             <button class="tab-btn px-6 py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-all" onclick="switchTab('analytics', this)">
                 <i class="fas fa-chart-bar mr-2"></i>学生数据
             </button>
+            <button class="tab-btn px-6 py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-all" onclick="switchTab('overview', this)">
+                <i class="fas fa-globe mr-2"></i>总览
+            </button>
         </div>
 
         <!-- ══ 课程管理 ══ -->
@@ -152,6 +155,13 @@
 
             <!-- 课程列表 -->
             <div id="lessonList" class="space-y-4">
+                <div class="text-center text-slate-400 py-10">加载中...</div>
+            </div>
+        </div>
+
+        <!-- ══ 总览 ══ -->
+        <div id="tab-overview" class="hidden">
+            <div id="overviewContent">
                 <div class="text-center text-slate-400 py-10">加载中...</div>
             </div>
         </div>
@@ -285,8 +295,9 @@ async function setupLessons() {
 function switchTab(tab, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-500'); });
     btn.classList.add('active'); btn.classList.remove('text-slate-500');
-    ['lessons', 'analytics'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
+    ['lessons', 'analytics', 'overview'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
     if (tab === 'analytics') populateAnalyticsSelect();
+    if (tab === 'overview')  loadOverview();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -709,6 +720,109 @@ function downloadPDF() {
         </table>
     </body></html>`);
     win.document.close();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  总览
+// ════════════════════════════════════════════════════════════════
+async function loadOverview() {
+    const content = document.getElementById('overviewContent');
+    content.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
+    try {
+        const [classSnap, attSnap] = await Promise.all([
+            db.collection('classes').get(),
+            db.collection('attempts').get()
+        ]);
+
+        const registeredCodes = new Set(classSnap.docs.map(d => d.id));
+        const attempts = attSnap.docs.map(d => ({ ...d.data() }));
+
+        // 按 classCode 汇总
+        const statsMap = {};
+        for (const a of attempts) {
+            const cls = a.classCode || '（无代码）';
+            if (!statsMap[cls]) statsMap[cls] = { students: new Set(), attempts: 0, completed: 0, lastAt: null };
+            statsMap[cls].students.add(a.studentName);
+            statsMap[cls].attempts++;
+            if (a.completedAt) statsMap[cls].completed++;
+            const t = a.startedAt?.toDate?.();
+            if (t && (!statsMap[cls].lastAt || t > statsMap[cls].lastAt)) statsMap[cls].lastAt = t;
+        }
+
+        // 合并已注册但还没学生的班级
+        for (const code of registeredCodes) {
+            if (!statsMap[code]) statsMap[code] = { students: new Set(), attempts: 0, completed: 0, lastAt: null };
+        }
+
+        const rows = Object.entries(statsMap).map(([code, s]) => ({
+            code,
+            registered: registeredCodes.has(code),
+            students:   s.students.size,
+            attempts:   s.attempts,
+            completed:  s.completed,
+            lastAt:     s.lastAt
+        })).sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
+
+        // 全站汇总
+        const totalStudents  = new Set(attempts.filter(a => a.classCode).map(a => a.studentName + '@' + a.classCode)).size;
+        const totalAttempts  = attempts.length;
+        const totalCompleted = attempts.filter(a => a.completedAt).length;
+
+        const fmt = d => d ? d.toLocaleDateString('zh-CN', { month:'numeric', day:'numeric' }) : '—';
+
+        content.innerHTML = `
+        <!-- 全站统计卡 -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            ${[
+                ['🏫', rows.length,      '班级总数',   'blue'],
+                ['👦', totalStudents,    '学生总数',   'purple'],
+                ['📝', totalAttempts,    '总练习次数', 'amber'],
+                ['✅', totalCompleted,   '总完成次数', 'green'],
+            ].map(([icon, val, label, c]) => `
+            <div class="bg-white rounded-2xl p-5 text-center shadow-sm border border-${c}-100">
+                <div class="text-2xl mb-1">${icon}</div>
+                <div class="text-3xl font-black text-${c}-600 mb-1">${val}</div>
+                <div class="text-xs font-bold text-${c}-400">${label}</div>
+            </div>`).join('')}
+        </div>
+
+        <!-- 班级明细 -->
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-50 flex items-center justify-between">
+                <span class="font-black text-slate-700">班级明细</span>
+                <span class="text-xs text-slate-400">${rows.length} 个班级</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                            <th class="text-left px-6 py-3 font-bold text-slate-500">班级代码</th>
+                            <th class="text-center px-4 py-3 font-bold text-slate-500">学生</th>
+                            <th class="text-center px-4 py-3 font-bold text-slate-500">练习</th>
+                            <th class="text-center px-4 py-3 font-bold text-slate-500">完成</th>
+                            <th class="text-center px-4 py-3 font-bold text-slate-500">最近活跃</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.length ? rows.map(r => `
+                        <tr class="border-t border-slate-50 hover:bg-slate-50/50">
+                            <td class="px-6 py-4">
+                                <span class="font-black text-slate-800">${r.code}</span>
+                                ${r.registered ? '<span class="ml-2 text-[10px] bg-purple-50 text-purple-500 font-bold px-2 py-0.5 rounded-full">已注册</span>' : ''}
+                            </td>
+                            <td class="px-4 py-4 text-center font-bold text-slate-700">${r.students}</td>
+                            <td class="px-4 py-4 text-center font-bold text-blue-600">${r.attempts}</td>
+                            <td class="px-4 py-4 text-center font-bold text-green-600">${r.completed}</td>
+                            <td class="px-4 py-4 text-center text-slate-400 text-xs">${fmt(r.lastAt)}</td>
+                        </tr>`).join('') : `
+                        <tr><td colspan="5" class="text-center py-10 text-slate-300">还没有任何班级数据</td></tr>`}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    } catch(e) {
+        content.innerHTML = `<div class="text-red-400 text-center py-10">加载失败：${e.message}</div>`;
+    }
 }
 
 // ── 工具 ──────────────────────────────────────────────────────
