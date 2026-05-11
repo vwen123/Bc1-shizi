@@ -724,7 +724,9 @@ function sendToSheet(total) {
             unit:        currentLesson.unit,
             lessonTitle: currentLesson.title,
             totalScore:  total,
-            submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
+            submittedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+            words:       currentLesson.words.map(w => w.word),
+            scores:      itemScores
         })
     }).catch(() => {});
 }
