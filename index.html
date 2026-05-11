@@ -88,10 +88,14 @@
             </div>
         </div>
 
-        <div class="mt-5 pt-4 border-t border-slate-100">
+        <div class="mt-5 pt-4 border-t border-slate-100 space-y-2">
             <button onclick="openLeaderboard()"
                 class="w-full py-3 rounded-2xl bg-amber-50 text-amber-600 font-bold hover:bg-amber-100 transition-all flex items-center justify-center gap-2 text-sm">
                 🏆 查看班级排行榜
+            </button>
+            <button onclick="openTeacherMode()"
+                class="w-full py-2.5 rounded-2xl text-slate-400 hover:bg-slate-50 font-bold transition-all flex items-center justify-center gap-2 text-xs">
+                <i class="fas fa-chalkboard-teacher"></i> 教师入口
             </button>
         </div>
     </div>
@@ -186,7 +190,86 @@
     </div>
 </div>
 
-<!-- ════════════ 界面四：排行榜 ════════════ -->
+<!-- ════════════ 界面四：教师专区 ════════════ -->
+<div id="screenTeacher" class="hidden max-w-md mx-auto px-6 py-12">
+    <div class="bg-white rounded-[2.5rem] shadow-2xl border-b-8 border-purple-600 p-8">
+
+        <!-- 顶部 -->
+        <div class="flex items-center justify-between mb-6">
+            <button onclick="goHome()" class="w-9 h-9 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-all">
+                <i class="fas fa-arrow-left text-sm"></i>
+            </button>
+            <div class="text-center">
+                <div class="text-2xl font-black text-purple-600">教师专区</div>
+                <div id="teacherClassLabel" class="text-xs text-slate-400 font-bold"></div>
+            </div>
+            <button id="teacherLogoutBtn" onclick="teacherLogout()" class="hidden text-xs text-slate-400 hover:text-slate-600 font-bold px-3 py-2 rounded-xl hover:bg-slate-100 transition-all">
+                退出
+            </button>
+            <div id="teacherLogoutPlaceholder" class="w-9"></div>
+        </div>
+
+        <!-- ── 登录 / 注册面板 ── -->
+        <div id="teacherAuthPanel">
+            <!-- 标签 -->
+            <div class="flex bg-slate-100 rounded-2xl p-1 mb-6">
+                <button id="tabCreate" onclick="switchTeacherTab('create')"
+                    class="flex-1 py-2.5 rounded-xl text-sm font-black transition-all bg-white text-purple-600 shadow-sm">
+                    创建班级
+                </button>
+                <button id="tabLogin" onclick="switchTeacherTab('login')"
+                    class="flex-1 py-2.5 rounded-xl text-sm font-black transition-all text-slate-400">
+                    进入班级
+                </button>
+            </div>
+
+            <!-- 创建班级 -->
+            <div id="teacherCreateForm" class="space-y-3">
+                <input id="tcClassCode" type="text" placeholder="设定班级代码（如 SMKB1A）" maxlength="12"
+                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg uppercase focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 font-bold tracking-wider">
+                <input id="tcPin" type="password" placeholder="设定教师密码（4-8位）" maxlength="8"
+                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 tracking-widest">
+                <input id="tcPinConfirm" type="password" placeholder="再输一次确认" maxlength="8"
+                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 tracking-widest">
+                <button onclick="createClass()"
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-black text-lg transition-all shadow-lg shadow-purple-100">
+                    创建班级
+                </button>
+                <p class="text-xs text-slate-300 text-center">创建后把班级代码告知学生即可</p>
+            </div>
+
+            <!-- 进入班级 -->
+            <div id="teacherLoginForm" class="space-y-3 hidden">
+                <input id="tlClassCode" type="text" placeholder="班级代码" maxlength="12"
+                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg uppercase focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 font-bold tracking-wider">
+                <input id="tlPin" type="password" placeholder="教师密码" maxlength="8"
+                    class="w-full px-5 py-4 border-2 border-slate-100 rounded-2xl text-center text-lg focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-50 transition-all bg-slate-50/50 tracking-widest">
+                <button onclick="teacherLogin()"
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-2xl font-black text-lg transition-all shadow-lg shadow-purple-100">
+                    进入
+                </button>
+            </div>
+        </div>
+
+        <!-- ── 班级数据面板（登录后） ── -->
+        <div id="teacherDataPanel" class="hidden">
+            <div class="flex items-center gap-3 mb-5">
+                <label class="text-sm font-bold text-slate-500 shrink-0">课题：</label>
+                <select id="teacherLessonSelect" onchange="loadTeacherAnalytics()"
+                    class="flex-1 p-3 border-2 border-slate-100 rounded-xl text-sm focus:outline-none focus:border-purple-400 font-bold">
+                    <option value="">— 请选择 —</option>
+                </select>
+            </div>
+
+            <div id="teacherAnalyticsContent">
+                <div class="text-center text-slate-300 py-10 text-sm">请选择课题查看数据</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ════════════ 界面五：排行榜 ════════════ -->
 <div id="screenLeaderboard" class="hidden max-w-2xl mx-auto px-4 py-8">
 
     <!-- 顶部导航 -->
@@ -755,7 +838,7 @@ function launchConfetti() {
 }
 
 function showScreen(id) {
-    ['screenStart','screenLearn','screenReward','screenLeaderboard'].forEach(s =>
+    ['screenStart','screenLearn','screenReward','screenTeacher','screenLeaderboard'].forEach(s =>
         document.getElementById(s).classList.toggle('hidden', s !== id)
     );
 }
@@ -764,6 +847,162 @@ function goHome() {
     window.speechSynthesis.cancel();
     currentAttemptId = null;
     showScreen('screenStart');
+}
+
+// ════════════════════════════════════════
+//  教师专区
+// ════════════════════════════════════════
+let teacherClassCode = '';
+let teacherAttempts  = [];
+
+function openTeacherMode() {
+    showScreen('screenTeacher');
+    document.getElementById('teacherAuthPanel').classList.remove('hidden');
+    document.getElementById('teacherDataPanel').classList.add('hidden');
+    document.getElementById('teacherLogoutBtn').classList.add('hidden');
+    document.getElementById('teacherLogoutPlaceholder').classList.remove('hidden');
+    document.getElementById('teacherClassLabel').textContent = '';
+    switchTeacherTab('create');
+}
+
+function switchTeacherTab(tab) {
+    const isCreate = tab === 'create';
+    document.getElementById('teacherCreateForm').classList.toggle('hidden', !isCreate);
+    document.getElementById('teacherLoginForm').classList.toggle('hidden', isCreate);
+    const activeClass   = 'bg-white text-purple-600 shadow-sm';
+    const inactiveClass = 'text-slate-400';
+    document.getElementById('tabCreate').className = `flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${isCreate ? activeClass : inactiveClass}`;
+    document.getElementById('tabLogin').className  = `flex-1 py-2.5 rounded-xl text-sm font-black transition-all ${isCreate ? inactiveClass : activeClass}`;
+}
+
+async function createClass() {
+    const cls  = document.getElementById('tcClassCode').value.trim().toUpperCase();
+    const pin  = document.getElementById('tcPin').value;
+    const pin2 = document.getElementById('tcPinConfirm').value;
+    if (!cls)        { showMsg('请输入班级代码'); return; }
+    if (pin.length < 4) { showMsg('密码至少 4 位'); return; }
+    if (pin !== pin2)   { showMsg('两次密码不一致'); return; }
+    try {
+        const doc = await db.collection('classes').doc(cls).get();
+        if (doc.exists) { showMsg('此班级代码已被使用，换一个试试'); return; }
+        await db.collection('classes').doc(cls).set({
+            pin, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showMsg(`班级 ${cls} 创建成功！`);
+        document.getElementById('tcClassCode').value = '';
+        document.getElementById('tcPin').value = '';
+        document.getElementById('tcPinConfirm').value = '';
+        teacherClassCode = cls;
+        enterTeacherDashboard(cls);
+    } catch(e) { showMsg('创建失败：' + e.message); }
+}
+
+async function teacherLogin() {
+    const cls = document.getElementById('tlClassCode').value.trim().toUpperCase();
+    const pin = document.getElementById('tlPin').value;
+    if (!cls || !pin) { showMsg('请填写班级代码和密码'); return; }
+    try {
+        const doc = await db.collection('classes').doc(cls).get();
+        if (!doc.exists)          { showMsg('找不到此班级，请先创建'); return; }
+        if (doc.data().pin !== pin) { showMsg('密码错误');              return; }
+        teacherClassCode = cls;
+        enterTeacherDashboard(cls);
+    } catch(e) { showMsg('登录失败：' + e.message); }
+}
+
+async function enterTeacherDashboard(cls) {
+    document.getElementById('teacherAuthPanel').classList.add('hidden');
+    document.getElementById('teacherDataPanel').classList.remove('hidden');
+    document.getElementById('teacherLogoutBtn').classList.remove('hidden');
+    document.getElementById('teacherLogoutPlaceholder').classList.add('hidden');
+    document.getElementById('teacherClassLabel').textContent = cls + ' 班';
+
+    // 填充课题下拉
+    const sel = document.getElementById('teacherLessonSelect');
+    sel.innerHTML = '<option value="">— 请选择 —</option>' +
+        allLessons.map(l => `<option value="${l.lessonId}">${l.title}</option>`).join('');
+
+    // 预载全班 attempts
+    const snap = await db.collection('attempts').where('classCode', '==', cls).get();
+    teacherAttempts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+async function loadTeacherAnalytics() {
+    const lessonId = document.getElementById('teacherLessonSelect').value;
+    const content  = document.getElementById('teacherAnalyticsContent');
+    if (!lessonId) {
+        content.innerHTML = '<div class="text-center text-slate-300 py-10 text-sm">请选择课题查看数据</div>';
+        return;
+    }
+    const attempts = teacherAttempts
+        .filter(a => a.lessonId === lessonId)
+        .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+
+    const completed = attempts.filter(a => a.completedAt);
+    const avg = completed.length
+        ? Math.round(completed.reduce((s, a) => s + (a.totalScore || 0), 0) / completed.length) : 0;
+
+    content.innerHTML = `
+    <div class="grid grid-cols-3 gap-2 mb-5">
+        ${[['参与', attempts.length, 'blue'], ['完成', completed.length, 'green'], ['平均分', avg, 'amber']]
+            .map(([l, v, c]) => `
+        <div class="bg-${c}-50 rounded-2xl p-3 text-center border border-${c}-100">
+            <div class="text-xl font-black text-${c}-600">${v}</div>
+            <div class="text-[10px] font-bold text-${c}-400">${l}</div>
+        </div>`).join('')}
+    </div>
+    ${attempts.length ? `
+    <div class="overflow-x-auto rounded-2xl border border-slate-100 mb-4">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="text-left px-4 py-2.5 font-bold text-slate-500 text-xs">代号</th>
+                    <th class="text-center px-3 py-2.5 font-bold text-slate-500 text-xs">总分</th>
+                    <th class="text-center px-3 py-2.5 font-bold text-slate-500 text-xs">完成</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${attempts.map(a => `
+                <tr class="border-t border-slate-50">
+                    <td class="px-4 py-3 font-bold text-slate-700">${a.studentName}</td>
+                    <td class="px-3 py-3 text-center font-black text-blue-600">${a.totalScore ?? '—'}</td>
+                    <td class="px-3 py-3 text-center text-lg">${a.completedAt ? '✅' : '🔄'}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>
+    <button onclick="downloadTeacherCSV()"
+        class="w-full py-3 rounded-2xl bg-emerald-50 text-emerald-600 font-black hover:bg-emerald-100 transition-all text-sm flex items-center justify-center gap-2">
+        <i class="fas fa-file-csv"></i> 下载 CSV
+    </button>` : '<div class="text-center text-slate-300 py-8 text-sm">这课还没有学生练习</div>'}`;
+}
+
+function downloadTeacherCSV() {
+    const lessonId = document.getElementById('teacherLessonSelect').value;
+    const lessonTitle = allLessons.find(l => l.lessonId === lessonId)?.title || '成绩单';
+    const attempts = teacherAttempts.filter(a => a.lessonId === lessonId)
+        .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
+    if (!attempts.length) { showMsg('没有数据可导出'); return; }
+    const rows = [
+        ['代号', '总分', '完成状态', '时间'],
+        ...attempts.map(a => [
+            a.studentName, a.totalScore ?? '',
+            a.completedAt ? '完成' : '进行中',
+            a.startedAt?.toDate?.()?.toLocaleString('zh-CN', { hour12: false }) || ''
+        ])
+    ];
+    const csv  = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `${lessonTitle}_${teacherClassCode}.csv`; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function teacherLogout() {
+    teacherClassCode = '';
+    teacherAttempts  = [];
+    openTeacherMode();
 }
 
 // ════════════════════════════════════════
