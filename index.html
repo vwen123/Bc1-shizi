@@ -67,6 +67,11 @@
         <h1 class="text-4xl font-black text-blue-600 mb-2 tracking-tight">小状元识字</h1>
         <p class="text-slate-400 mb-8 font-medium">像状元一样快乐读书</p>
 
+        <div class="text-left mb-4">
+            <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">学校名称</label>
+            <input id="inputSchool" type="text" placeholder="例：YANI"
+                   class="w-full px-6 py-4 border-2 border-slate-100 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/50">
+        </div>
         <div class="text-left mb-6">
             <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">输入你的名字</label>
             <input id="inputName" type="text" placeholder="大名鼎鼎的小状元..."
@@ -211,6 +216,9 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
+// 填入 Google Apps Script Web App URL（部署后从 GAS 复制）
+const GAS_URL = '';
+
 // ════════════════════════════════════════
 //  应用状态
 // ════════════════════════════════════════
@@ -218,6 +226,7 @@ let allLessons    = [];
 let currentLesson = null;
 let currentParas  = [];
 let studentName   = '';
+let school        = '';
 let itemScores    = {};
 let totalItems    = 0;
 let currentAttemptId = null;
@@ -231,8 +240,10 @@ let _recStop = false;
 //  初始化 — 从 Firestore 加载课程
 // ════════════════════════════════════════
 window.onload = async () => {
-    const saved = localStorage.getItem('shizi_studentName');
-    if (saved) document.getElementById('inputName').value = saved;
+    const savedName   = localStorage.getItem('shizi_studentName');
+    const savedSchool = localStorage.getItem('shizi_school');
+    if (savedName)   document.getElementById('inputName').value   = savedName;
+    if (savedSchool) document.getElementById('inputSchool').value = savedSchool;
 
     try {
         const snap = await db.collection('lessons').get();
@@ -279,8 +290,11 @@ function renderLessonMenu() {
 //  开始课程
 // ════════════════════════════════════════
 function startLesson(idx) {
+    school      = document.getElementById('inputSchool').value.trim();
     studentName = document.getElementById('inputName').value.trim();
+    if (!school)      { showMsg('请输入学校名称！'); return; }
     if (!studentName) { showMsg('状元公，请先赐名哦！'); return; }
+    localStorage.setItem('shizi_school',      school);
     localStorage.setItem('shizi_studentName', studentName);
 
     currentLesson    = allLessons[idx];
@@ -678,6 +692,7 @@ async function saveAttemptToGAS(completed = false) {
                 lessonId:    currentLesson.lessonId,
                 lessonTitle: currentLesson.title,
                 unit:        currentLesson.unit,
+                school,
                 studentName,
                 scores:      itemScores,
                 totalScore:  total,
@@ -692,6 +707,26 @@ async function saveAttemptToGAS(completed = false) {
             await db.collection('attempts').doc(currentAttemptId).update(update);
         }
     } catch(e) { /* 静默 */ }
+
+    // 完成时写入 Google Sheets（fire-and-forget，不阻塞 UI）
+    if (completed) sendToSheet(total);
+}
+
+function sendToSheet(total) {
+    if (!GAS_URL) return;
+    fetch(GAS_URL, {
+        method:  'POST',
+        mode:    'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body:    JSON.stringify({
+            school,
+            studentName,
+            unit:        currentLesson.unit,
+            lessonTitle: currentLesson.title,
+            totalScore:  total,
+            submittedAt: new Date().toLocaleString('zh-CN', { hour12: false })
+        })
+    }).catch(() => {});
 }
 
 // ════════════════════════════════════════
