@@ -124,12 +124,39 @@
     </section>
 
     <!-- 第二关：朗读 -->
-    <section class="pb-20">
+    <section class="mb-12">
         <div class="flex items-center gap-3 mb-6">
             <span class="w-10 h-10 bg-rose-500 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-rose-200">2</span>
             <h3 class="text-2xl font-black text-slate-800">金声朗读</h3>
         </div>
         <div id="paraList" class="space-y-6"></div>
+    </section>
+
+    <!-- 第三关：趣味游戏 -->
+    <section class="pb-20">
+        <div class="flex items-center gap-3 mb-6">
+            <span class="w-10 h-10 bg-violet-500 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-violet-200">3</span>
+            <h3 class="text-2xl font-black text-slate-800">趣味闯关</h3>
+        </div>
+
+        <!-- 游戏切换 -->
+        <div class="flex gap-3 mb-6">
+            <button id="gameTab-img" onclick="startGame('img')"
+                class="flex-1 py-3 rounded-2xl bg-violet-500 text-white font-black text-sm shadow-lg shadow-violet-100 transition-all">
+                🖼️ 看图选词
+            </button>
+            <button id="gameTab-pair" onclick="startGame('pair')"
+                class="flex-1 py-3 rounded-2xl bg-slate-100 text-slate-500 font-black text-sm transition-all hover:bg-slate-200">
+                🔗 词语配对
+            </button>
+        </div>
+
+        <div id="gameArea" class="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 min-h-[280px] flex items-center justify-center">
+            <div class="text-center text-slate-300">
+                <div class="text-5xl mb-3">🎮</div>
+                <div class="font-bold">选一个游戏开始挑战！</div>
+            </div>
+        </div>
     </section>
 </div>
 
@@ -196,8 +223,9 @@ let totalItems    = 0;
 let currentAttemptId = null;
 let activeQuizWriter = null;
 let activeQuizId     = null;
-let _rec             = null;   // 当前录音实例
-let _recId           = null;   // 当前录音的 id
+let _rec    = null;
+let _recId  = null;
+let _recStop = false;
 
 // ════════════════════════════════════════
 //  初始化 — 从 Firestore 加载课程
@@ -343,6 +371,10 @@ function renderParas() {
                         class="px-6 py-3 rounded-xl bg-slate-100 text-slate-600 font-black hover:bg-slate-200 transition-all">
                         <i class="fas fa-volume-up mr-2"></i>范读
                     </button>
+                    <button onclick="startFollowRead(currentParas[${i}],'${id}')"
+                        class="px-6 py-3 rounded-xl bg-violet-100 text-violet-600 font-black hover:bg-violet-200 transition-all">
+                        <i class="fas fa-headphones mr-2"></i>跟读
+                    </button>
                     <button id="btn-${id}" onclick="startRecognition(currentParas[${i}],'${id}')"
                         class="px-6 py-3 rounded-xl bg-rose-500 text-white font-black hover:bg-rose-600 transition-all shadow-lg shadow-rose-100">
                         <i class="fas fa-microphone mr-2"></i>朗读
@@ -365,7 +397,7 @@ function speak(text) {
 }
 
 // ════════════════════════════════════════
-//  朗读识别 + 实时评分（改进版）
+//  朗读识别 + 实时评分
 // ════════════════════════════════════════
 function startRecognition(target, id) {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -376,54 +408,51 @@ function startRecognition(target, id) {
     const scoreEl = document.getElementById(`score-${id}`);
     if (!btn) return;
 
-    // ── 点同一按钮 = 停止当前录音 ────────────────────────────
+    // 点同一按钮 = 手动停止
     if (_recId === id && _rec) {
+        _recStop = true;
         _rec.stop();
         return;
     }
-    // 停止其他正在进行的录音
-    if (_rec) { try { _rec.stop(); } catch(e) {} _rec = null; _recId = null; }
+    // 停止其他录音
+    if (_rec) { _recStop = true; try { _rec.stop(); } catch(e) {} _rec = null; _recId = null; }
 
-    const recognition         = new SR();
-    recognition.lang          = 'zh-CN';
-    recognition.continuous    = true;    // 持续聆听，不会中途断掉
+    const recognition          = new SR();
+    recognition.lang           = 'zh-CN';
+    recognition.continuous     = true;
     recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
+    recognition.maxAlternatives = 3;   // 取最佳候选，提高准确率
 
-    _rec   = recognition;
-    _recId = id;
+    _rec     = recognition;
+    _recId   = id;
+    _recStop = false;
 
-    // ── 判断按钮形状（词语卡是正方形，段落是长方形）────────────
     const isSquare = btn.classList.contains('aspect-square');
-
-    // 保存原始样式
     const origBg   = isSquare ? 'bg-rose-50 text-rose-500 hover:bg-rose-100'
                               : 'bg-rose-500 text-white hover:bg-rose-600 shadow-lg shadow-rose-100';
     const recBg    = 'bg-red-500 text-white';
 
-    btn.className  = btn.className.replace(origBg, recBg) + ' rec-active';
-    btn.innerHTML  = isSquare
-        ? '<i class="fas fa-stop"></i>'
-        : '<i class="fas fa-stop mr-2"></i>停止';
-
+    btn.className = btn.className.replace(origBg, recBg) + ' rec-active';
+    btn.innerHTML = isSquare ? '<i class="fas fa-stop"></i>'
+                             : '<i class="fas fa-stop mr-2"></i>停止';
     if (display) display.innerHTML =
         '<span class="text-slate-400 text-sm animate-pulse">🎤 请开始朗读...</span>';
 
     let accumulated  = '';
     let silenceTimer = null;
 
-    // ── 完成录音 → 计分 ──────────────────────────────────────
+    const restoreBtn = () => {
+        btn.classList.remove('rec-active');
+        btn.className = btn.className.replace(recBg, origBg).replace(' rec-active', '');
+        btn.innerHTML = isSquare ? '<i class="fas fa-microphone"></i>'
+                                 : '<i class="fas fa-microphone mr-2"></i>朗读';
+    };
+
     const finish = (spoken) => {
         if (_rec !== recognition) return;
         _rec = null; _recId = null;
         clearTimeout(silenceTimer);
-
-        // 还原按钮
-        btn.classList.remove('rec-active');
-        btn.className = btn.className.replace(recBg, origBg).replace(' rec-active','');
-        btn.innerHTML = isSquare
-            ? '<i class="fas fa-microphone"></i>'
-            : '<i class="fas fa-microphone mr-2"></i>朗读';
+        restoreBtn();
 
         const text = spoken.trim();
         if (!text) {
@@ -431,11 +460,9 @@ function startRecognition(target, id) {
                 '<span class="text-slate-300 text-sm">没有识别到声音，请靠近麦克风再试 🎤</span>';
             return;
         }
-
         const score = calcScore(target, text);
         const stars = score >= 90 ? 5 : score >= 75 ? 4 : score >= 55 ? 3 : score >= 30 ? 2 : 1;
         const msgs  = ['再来一次！🌈','继续练习！💪','不错，加油！😊','读得很好！👍','完美！🌟'];
-
         if (display) display.innerHTML = highlightMatch(target, text);
         if (scoreEl) scoreEl.innerHTML = `
             <div class="flex items-center flex-wrap gap-1.5 mt-1">
@@ -444,45 +471,49 @@ function startRecognition(target, id) {
                 <span class="text-slate-400 text-xs">${msgs[stars-1]}</span>
             </div>
             <div class="text-slate-300 text-xs mt-0.5 truncate">识别：${text}</div>`;
-
         updateItemScore(id, score);
         saveAttemptToGAS();
         checkAllDone();
     };
 
-    // ── 事件处理 ──────────────────────────────────────────────
     recognition.onspeechstart = () => {
         if (display && !accumulated)
             display.innerHTML = '<span class="text-blue-400 text-sm"><i class="fas fa-circle text-red-500 animate-pulse text-xs mr-1"></i>检测到声音，继续读...</span>';
     };
 
     recognition.onresult = (e) => {
-        let interim = '', final = '';
+        let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
-            if (e.results[i].isFinal) final   += e.results[i][0].transcript;
-            else                      interim += e.results[i][0].transcript;
+            if (e.results[i].isFinal) {
+                // 从多个候选中选得分最高的
+                let best = e.results[i][0].transcript;
+                let bestScore = calcScore(target, best);
+                for (let j = 1; j < e.results[i].length; j++) {
+                    const alt = e.results[i][j].transcript;
+                    const s   = calcScore(target, alt);
+                    if (s > bestScore) { bestScore = s; best = alt; }
+                }
+                accumulated += best;
+            } else {
+                interim += e.results[i][0].transcript;
+            }
         }
-        if (final) accumulated += final;
+        if (display && (accumulated + interim))
+            display.innerHTML = highlightMatch(target, accumulated + interim);
 
-        // 实时高亮
-        const current = accumulated + interim;
-        if (display && current)
-            display.innerHTML = highlightMatch(target, current);
-
-        // 停顿 1.8 秒后自动结束
+        // 停顿 2.5 秒后结束（原 1.8 秒，小朋友需要更多时间）
         clearTimeout(silenceTimer);
-        silenceTimer = setTimeout(() => { try { recognition.stop(); } catch(e){} }, 1800);
+        silenceTimer = setTimeout(() => {
+            _recStop = true;
+            try { recognition.stop(); } catch(e) {}
+        }, 2500);
     };
 
     recognition.onerror = (e) => {
+        if (_rec !== recognition) return;
         _rec = null; _recId = null;
         clearTimeout(silenceTimer);
-        btn.classList.remove('rec-active');
-        btn.className = btn.className.replace(recBg, origBg).replace(' rec-active','');
-        btn.innerHTML = isSquare
-            ? '<i class="fas fa-microphone"></i>'
-            : '<i class="fas fa-microphone mr-2"></i>朗读';
-
+        restoreBtn();
         const errMsgs = {
             'not-allowed':   '请在浏览器设置中允许使用麦克风 🎤',
             'no-speech':     '没有检测到声音，请再试一次',
@@ -494,7 +525,14 @@ function startRecognition(target, id) {
         if (msg && display) display.innerHTML = `<span class="text-red-400 text-sm">${msg}</span>`;
     };
 
-    recognition.onend = () => { finish(accumulated); };
+    recognition.onend = () => {
+        if (_rec !== recognition) return;
+        if (!_recStop) {
+            // 浏览器意外断开 → 无缝重启
+            try { recognition.start(); return; } catch(e) { /* 重启失败则结束 */ }
+        }
+        finish(accumulated);
+    };
 
     try { recognition.start(); }
     catch(e) { _rec = null; _recId = null; showMsg('无法启动录音：' + e.message); }
@@ -682,6 +720,221 @@ function goHome() {
     window.speechSynthesis.cancel();
     currentAttemptId = null;
     showScreen('screenStart');
+}
+
+// ════════════════════════════════════════
+//  跟读模式
+// ════════════════════════════════════════
+function startFollowRead(text, id) {
+    const display = document.getElementById(`display-${id}`);
+    if (display) display.innerHTML =
+        '<span class="text-violet-400 animate-pulse">🔊 聆听范读中，请跟着读...</span>';
+    window.speechSynthesis.cancel();
+    const u  = new SpeechSynthesisUtterance(text);
+    u.lang   = 'zh-CN';
+    u.rate   = 0.75;
+    u.onend  = () => {
+        if (display) display.innerHTML =
+            '<span class="text-blue-400 animate-pulse">🎤 轮到你了，请开始朗读！</span>';
+        setTimeout(() => startRecognition(text, id), 700);
+    };
+    window.speechSynthesis.speak(u);
+}
+
+// ════════════════════════════════════════
+//  趣味游戏
+// ════════════════════════════════════════
+const shuffle = arr => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+};
+
+let gs = {};   // game state
+
+function startGame(type) {
+    ['img','pair'].forEach(t => {
+        const tab = document.getElementById('gameTab-' + t);
+        tab.className = t === type
+            ? 'flex-1 py-3 rounded-2xl bg-violet-500 text-white font-black text-sm shadow-lg shadow-violet-100 transition-all'
+            : 'flex-1 py-3 rounded-2xl bg-slate-100 text-slate-500 font-black text-sm transition-all hover:bg-slate-200';
+    });
+    type === 'img' ? initImgGame() : initPairGame();
+}
+
+// ── 看图选词 ──────────────────────────────────────────────────
+function initImgGame() {
+    const words = currentLesson?.words;
+    if (!words?.length) return;
+    gs.img = { order: shuffle(words.map((_, i) => i)), cur: 0, score: 0 };
+    renderImgRound();
+}
+
+function renderImgRound() {
+    const { order, cur, score } = gs.img;
+    const words  = currentLesson.words;
+    const area   = document.getElementById('gameArea');
+    const total  = order.length;
+
+    if (cur >= total) {
+        const pct = Math.round(score / total * 100);
+        area.innerHTML = `
+        <div class="text-center py-6 w-full">
+            <div class="text-6xl mb-3">${pct >= 75 ? '🎉' : pct >= 50 ? '😊' : '💪'}</div>
+            <div class="text-3xl font-black text-violet-600 mb-1">${score} / ${total}</div>
+            <div class="text-slate-400 mb-6">看图选词完成！</div>
+            <button onclick="initImgGame()"
+                class="px-8 py-3 bg-violet-500 text-white rounded-2xl font-black hover:bg-violet-600 transition-all">
+                再来一次
+            </button>
+        </div>`;
+        updateItemScore('game-img', pct);
+        saveAttemptToGAS();
+        checkAllDone();
+        return;
+    }
+
+    const targetIdx = order[cur];
+    const target    = words[targetIdx];
+    const others    = shuffle(words.map((_, i) => i).filter(i => i !== targetIdx)).slice(0, 3);
+    const opts      = shuffle([targetIdx, ...others]);
+    const dots      = Array.from({ length: total }, (_, i) =>
+        `<div class="w-2 h-2 rounded-full ${i < cur ? 'bg-violet-400' : i === cur ? 'bg-violet-600' : 'bg-slate-200'}"></div>`
+    ).join('');
+
+    area.innerHTML = `
+    <div class="w-full">
+        <div class="flex justify-between items-center mb-5">
+            <span class="text-xs font-bold text-slate-400">第 ${cur+1} / ${total} 题</span>
+            <div class="flex gap-1">${dots}</div>
+            <span class="text-xs font-bold text-violet-600">${score} 分</span>
+        </div>
+        <div class="text-center mb-5">
+            <div class="text-rose-500 font-black text-2xl mb-0.5">${target.pinyin}</div>
+            <div class="hanzi-font text-4xl text-slate-700">${target.word}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            ${opts.map(idx => {
+                const w = words[idx];
+                return `<button onclick="answerImg(this,${idx},${targetIdx})"
+                    class="game-opt rounded-2xl overflow-hidden border-2 border-slate-100 hover:border-violet-300 transition-all bg-slate-50">
+                    <div class="h-28 flex items-center justify-center overflow-hidden">
+                        ${w.imgUrl
+                            ? `<img src="${w.imgUrl}" class="w-full h-full object-cover" onerror="this.parentNode.innerHTML='<span class=\\'text-5xl\\'>${w.emoji||'📚'}</span>'">`
+                            : `<span class="text-5xl">${w.emoji || '📚'}</span>`}
+                    </div>
+                </button>`;
+            }).join('')}
+        </div>
+    </div>`;
+}
+
+function answerImg(btn, selected, correct) {
+    document.querySelectorAll('.game-opt').forEach(b => { b.onclick = null; b.style.pointerEvents = 'none'; });
+    if (selected === correct) {
+        gs.img.score++;
+        btn.classList.add('border-green-400', 'bg-green-50');
+        btn.innerHTML += '<div class="text-green-500 font-black text-center py-1 text-sm">✓ 正确！</div>';
+    } else {
+        btn.classList.add('border-red-400', 'bg-red-50');
+        btn.innerHTML += '<div class="text-red-400 font-bold text-center py-1 text-sm">✗ 再想想</div>';
+    }
+    setTimeout(() => { gs.img.cur++; renderImgRound(); }, 900);
+}
+
+// ── 词语配对 ──────────────────────────────────────────────────
+function initPairGame() {
+    const words = currentLesson?.words;
+    if (!words?.length) return;
+    gs.pair = {
+        pinyinOrder: shuffle(words.map((_, i) => i)),
+        selected: null,
+        matched: new Set(),
+        wrongs: 0
+    };
+    renderPairGame();
+}
+
+function renderPairGame() {
+    const { pinyinOrder, selected, matched } = gs.pair;
+    const words  = currentLesson.words;
+    const area   = document.getElementById('gameArea');
+
+    if (matched.size === words.length) {
+        const score = Math.max(0, 100 - gs.pair.wrongs * 10);
+        area.innerHTML = `
+        <div class="text-center py-6 w-full">
+            <div class="text-6xl mb-3">🎉</div>
+            <div class="text-3xl font-black text-violet-600 mb-1">${score} 分</div>
+            <div class="text-slate-400 mb-2">错误 ${gs.pair.wrongs} 次</div>
+            <div class="text-slate-400 mb-6">配对完成！</div>
+            <button onclick="initPairGame()"
+                class="px-8 py-3 bg-violet-500 text-white rounded-2xl font-black hover:bg-violet-600 transition-all">
+                再来一次
+            </button>
+        </div>`;
+        updateItemScore('game-pair', score);
+        saveAttemptToGAS();
+        checkAllDone();
+        return;
+    }
+
+    const cell = (type, idx, label, extra = '') => {
+        const done  = matched.has(idx);
+        const isSel = selected?.type === type && selected?.idx === idx;
+        const cls   = done  ? 'bg-green-50 border-green-300 text-green-600 cursor-default' :
+                      isSel ? 'bg-violet-500 border-violet-500 text-white shadow-lg scale-105' :
+                              'bg-white border-slate-200 text-slate-800 hover:border-violet-300';
+        return `<button onclick="${done ? '' : `selectPair('${type}',${idx})`}"
+            class="w-full py-4 px-3 rounded-2xl border-2 font-black text-center transition-all text-sm ${cls} ${extra}">
+            ${label}
+        </button>`;
+    };
+
+    area.innerHTML = `
+    <div class="w-full">
+        <div class="text-xs font-bold text-slate-400 mb-4 text-center">点击词语，再点击对应的拼音来配对</div>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-3">
+                ${words.map((w, i) => cell('word', i, `<span class="hanzi-font text-2xl">${w.word}</span>`)).join('')}
+            </div>
+            <div class="space-y-3">
+                ${pinyinOrder.map(wi => cell('pinyin', wi, `<span class="text-rose-500">${words[wi].pinyin}</span>`)).join('')}
+            </div>
+        </div>
+        <div class="text-center mt-4 text-xs font-bold text-slate-300">已配对 ${matched.size} / ${words.length}</div>
+    </div>`;
+}
+
+function selectPair(type, idx) {
+    const { selected, matched } = gs.pair;
+    if (matched.has(idx)) return;
+
+    if (!selected) {
+        gs.pair.selected = { type, idx };
+        renderPairGame();
+        return;
+    }
+    if (selected.type === type) {
+        gs.pair.selected = { type, idx };
+        renderPairGame();
+        return;
+    }
+
+    const wordIdx   = type === 'word'   ? idx : selected.idx;
+    const pinyinIdx = type === 'pinyin' ? idx : selected.idx;
+
+    gs.pair.selected = null;
+    if (wordIdx === pinyinIdx) {
+        gs.pair.matched.add(wordIdx);
+    } else {
+        gs.pair.wrongs++;
+        showMsg('再想想 💭');
+    }
+    renderPairGame();
 }
 
 function showMsg(msg) {

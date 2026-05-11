@@ -86,6 +86,9 @@
             <button class="tab-btn px-6 py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-all" onclick="switchTab('analytics', this)">
                 <i class="fas fa-chart-bar mr-2"></i>学生数据
             </button>
+            <button class="tab-btn px-6 py-2.5 rounded-xl font-bold text-sm text-slate-500 hover:bg-slate-50 transition-all" onclick="switchTab('progress', this)">
+                <i class="fas fa-th mr-2"></i>进度看板
+            </button>
         </div>
 
         <!-- ══ 课程管理 ══ -->
@@ -150,6 +153,13 @@
 
             <!-- 课程列表 -->
             <div id="lessonList" class="space-y-4">
+                <div class="text-center text-slate-400 py-10">加载中...</div>
+            </div>
+        </div>
+
+        <!-- ══ 进度看板 ══ -->
+        <div id="tab-progress" class="hidden">
+            <div id="progressBoard">
                 <div class="text-center text-slate-400 py-10">加载中...</div>
             </div>
         </div>
@@ -271,8 +281,9 @@ async function setupLessons() {
 function switchTab(tab, btn) {
     document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.classList.add('text-slate-500'); });
     btn.classList.add('active'); btn.classList.remove('text-slate-500');
-    ['lessons', 'analytics'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
+    ['lessons', 'analytics', 'progress'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab));
     if (tab === 'analytics') populateAnalyticsSelect();
+    if (tab === 'progress')  loadProgressBoard();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -694,6 +705,81 @@ function downloadPDF() {
         </table>
     </body></html>`);
     win.document.close();
+}
+
+// ════════════════════════════════════════════════════════════════
+//  进度看板
+// ════════════════════════════════════════════════════════════════
+async function loadProgressBoard() {
+    const board = document.getElementById('progressBoard');
+    board.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
+    try {
+        const attSnap = await db.collection('attempts').get();
+        const attempts = attSnap.docs.map(d => d.data());
+
+        const lessons = allLessons.filter(l => l.status === 'published');
+        if (!lessons.length) {
+            board.innerHTML = '<div class="text-center text-slate-300 py-10">还没有发布的课程</div>';
+            return;
+        }
+
+        // 每位学生每课的最佳状态
+        const statusMap = {};   // studentName → lessonId → 'done'|'partial'
+        for (const a of attempts) {
+            const s = a.studentName; const l = a.lessonId;
+            if (!s || !l) continue;
+            if (!statusMap[s]) statusMap[s] = {};
+            if (a.completedAt) statusMap[s][l] = 'done';
+            else if (!statusMap[s][l]) statusMap[s][l] = 'partial';
+        }
+
+        const students = Object.keys(statusMap).sort();
+        if (!students.length) {
+            board.innerHTML = '<div class="text-center text-slate-300 py-10">还没有学生练习数据</div>';
+            return;
+        }
+
+        // 统计每课完成人数
+        const doneCount = {};
+        lessons.forEach(l => {
+            doneCount[l.lessonId] = students.filter(s => statusMap[s][l.lessonId] === 'done').length;
+        });
+
+        board.innerHTML = `
+        <div class="overflow-x-auto rounded-3xl border border-slate-100 shadow-sm bg-white">
+            <table class="text-sm border-collapse w-full">
+                <thead>
+                    <tr class="bg-slate-50">
+                        <th class="text-left px-5 py-3 font-bold text-slate-500 sticky left-0 bg-slate-50 border-b border-slate-100 min-w-[100px]">
+                            学生 <span class="text-slate-300 font-normal">(${students.length})</span>
+                        </th>
+                        ${lessons.map(l => `
+                        <th class="px-4 py-3 font-bold text-slate-500 border-b border-slate-100 text-center whitespace-nowrap text-xs min-w-[80px]">
+                            <div>${l.title}</div>
+                            <div class="text-[10px] text-green-500 font-black mt-0.5">${doneCount[l.lessonId]}/${students.length} 完成</div>
+                        </th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${students.map((student, si) => `
+                    <tr class="${si % 2 === 0 ? '' : 'bg-slate-50/50'} hover:bg-blue-50/30 transition-colors">
+                        <td class="px-5 py-3 font-bold text-slate-700 sticky left-0 ${si % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} border-b border-slate-50">${student}</td>
+                        ${lessons.map(l => {
+                            const st = statusMap[student]?.[l.lessonId];
+                            return `<td class="px-4 py-3 text-center text-xl border-b border-slate-50">${
+                                st === 'done' ? '✅' : st === 'partial' ? '🔄' : '⬜'
+                            }</td>`;
+                        }).join('')}
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div class="flex gap-6 mt-4 px-2 text-xs font-bold text-slate-400">
+            <span>✅ 已完成</span><span>🔄 练习中</span><span>⬜ 未开始</span>
+        </div>`;
+    } catch(e) {
+        board.innerHTML = `<div class="text-red-400 text-center py-10">加载失败：${e.message}</div>`;
+    }
 }
 
 // ── 工具 ──────────────────────────────────────────────────────
