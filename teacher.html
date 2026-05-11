@@ -559,9 +559,9 @@ async function loadAnalytics() {
 
 function renderAnalytics(lesson, attempts) {
     _exportLesson   = lesson;
-    _exportAttempts = attempts;
     const content   = document.getElementById('analyticsContent');
     const completed = attempts.filter(a => a.completedAt);
+    _exportAttempts = completed;
     const avgScore  = completed.length
         ? Math.round(completed.reduce((s, a) => s + (a.totalScore || 0), 0) / completed.length)
         : 0;
@@ -608,20 +608,18 @@ function renderAnalytics(lesson, attempts) {
                         <th class="text-left px-6 py-3 font-bold text-slate-500">学校</th>
                         <th class="text-left px-4 py-3 font-bold text-slate-500">姓名</th>
                         <th class="text-center px-4 py-3 font-bold text-slate-500">总分</th>
-                        <th class="text-center px-4 py-3 font-bold text-slate-500">完成</th>
-                        <th class="text-left px-4 py-3 font-bold text-slate-500">时间</th>
+                        <th class="text-left px-4 py-3 font-bold text-slate-500">完成时间</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${!attempts.length
-                        ? `<tr><td colspan="5" class="text-center py-10 text-slate-300">还没有学生参与</td></tr>`
-                        : attempts.map(a => `
+                    ${!completed.length
+                        ? `<tr><td colspan="4" class="text-center py-10 text-slate-300">还没有学生完成练习</td></tr>`
+                        : completed.map(a => `
                     <tr class="border-t border-slate-50 hover:bg-slate-50/50">
                         <td class="px-6 py-4 text-slate-500 text-sm">${a.school || '—'}</td>
                         <td class="px-4 py-4 font-bold text-slate-800">${a.studentName}</td>
                         <td class="px-4 py-4 text-center font-black text-blue-600">${a.totalScore ?? '—'}</td>
-                        <td class="px-4 py-4 text-center">${a.completedAt ? '完成' : '进行中'}</td>
-                        <td class="px-4 py-4 text-slate-400 text-xs">${new Date(a.startedAt).toLocaleString('zh-CN',{hour12:false})}</td>
+                        <td class="px-4 py-4 text-slate-400 text-xs">${new Date(a.completedAt).toLocaleString('zh-CN',{hour12:false})}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>
