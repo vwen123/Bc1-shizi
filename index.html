@@ -237,6 +237,19 @@ let _recId  = null;
 let _recStop = false;
 
 // ════════════════════════════════════════
+//  中文数字解析（用于排序）
+// ════════════════════════════════════════
+const CN_NUM = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+function parseLeadingCnNum(str) {
+    const m = (str || '').match(/[一二三四五六七八九十]/);
+    return m ? (CN_NUM[m[0]] || 999) : 999;
+}
+function parseUnitNum(unit) {
+    const m = (unit || '').match(/第([一二三四五六七八九十]+)单元/);
+    return m ? parseLeadingCnNum(m[1]) : 999;
+}
+
+// ════════════════════════════════════════
 //  初始化 — 从 Firestore 加载课程
 // ════════════════════════════════════════
 window.onload = async () => {
@@ -250,7 +263,11 @@ window.onload = async () => {
         allLessons = snap.docs
             .map(d => ({ lessonId: d.id, ...d.data() }))
             .filter(l => l.status === 'published')
-            .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+            .sort((a, b) => {
+                const ua = parseUnitNum(a.unit), ub = parseUnitNum(b.unit);
+                if (ua !== ub) return ua - ub;
+                return parseLeadingCnNum(a.title) - parseLeadingCnNum(b.title);
+            });
         renderLessonMenu();
     } catch(e) {
         document.getElementById('lessonMenu').innerHTML =
