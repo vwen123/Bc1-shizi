@@ -301,9 +301,9 @@ function startLesson(idx) {
     itemScores       = {};
     currentAttemptId = null;
 
-    // 按句号/感叹号/问号分段
+    // 按逗号/句号/感叹号/问号分句，一句句读
     currentParas = currentLesson.content
-        .split(/(?<=[。！？])/)
+        .split(/(?<=[，。！？])/)
         .map(s => s.trim()).filter(Boolean);
 
     totalItems = currentLesson.words.length + currentParas.length;
@@ -852,9 +852,9 @@ function renderImgRound() {
         </div>
 
         <!-- 大图 -->
-        <div class="rounded-2xl overflow-hidden mb-4 bg-slate-100 flex items-center justify-center" style="height:220px">
+        <div class="rounded-2xl overflow-hidden mb-4 bg-slate-100 flex items-center justify-center" style="height:340px">
             ${target.imgUrl
-                ? `<img src="${target.imgUrl}" class="w-full h-full object-cover"
+                ? `<img src="${target.imgUrl}" class="max-w-full max-h-full object-contain"
                        onerror="this.parentNode.innerHTML='<span style=\\'font-size:6rem\\'>${target.emoji||'📚'}</span>'">`
                 : `<span style="font-size:6rem">${target.emoji || '📚'}</span>`}
         </div>
