@@ -100,7 +100,7 @@ completedAt: timestamp | null
 
 ## 课程数据
 
-目前共 **3 单元 6 课**，图片已预生成存于 `images/` 文件夹。
+目前共 **4 单元 8 课**，图片已预生成存于 `images/` 文件夹。
 
 | 单元 | 课题 | 生词 |
 |------|------|------|
@@ -110,6 +110,8 @@ completedAt: timestamp | null
 | 第二单元·走进教室 | 二、学写字 | 写字、笔画、笔顺、眼到 |
 | 第三单元·我爱我的家 | 一、笑声回来了 | 笑声、爸爸、妈妈、回来 |
 | 第三单元·我爱我的家 | 二、星星 | 星星、天上、中间、三颗 |
+| 第九单元·心爱的东西 | 一、睡衣 | 夜、黑色、换、森林 |
+| 第九单元·心爱的东西 | 二、铅笔 | 用、铅笔、文字、图画 |
 
 图片 URL 格式：`https://vven123.github.io/Bc1-shizi/images/{拼音}.png`
 例：`https://vven123.github.io/Bc1-shizi/images/shang-xue.png`
@@ -172,7 +174,7 @@ score = (seqHits / totalChars * 0.6 + setHits / totalChars * 0.4) * 100
 ### 图片文件命名规则
 - 拼音 + 连字符，例：`shang-xue.png`、`xiao-niao.png`
 
-### 当前图片列表（24张）
+### 当前图片列表（32张）
 ```
 shang-xue  hua-er   tai-yang  xiao-men
 xiao-niao  zao-cao  shu-zhi   cao-di
@@ -180,6 +182,8 @@ shi-zi     du-shu   zhi-shi   er-ge
 xie-zi     bi-hua   bi-shun   yan-dao
 xiao-sheng ba-ba    ma-ma     hui-lai
 xing-xing  tian-shang  zhong-jian  san-ke
+ye         hei-se   huan      sen-lin
+yong       qian-bi  wen-zi    tu-hua
 ```
 
 ---
