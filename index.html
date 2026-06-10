@@ -231,6 +231,7 @@ let itemScores    = {};
 let totalItems    = 0;
 let currentAttemptId = null;
 let activeQuizWriter = null;
+let studentProgress  = {};
 let activeQuizId     = null;
 let _rec    = null;
 let _recId  = null;
@@ -249,6 +250,12 @@ function parseUnitNum(unit) {
     return m ? parseLeadingCnNum(m[1]) : 999;
 }
 
+// 计算课程的总学习项数（生词 + 句子，跟课中进度条算法一致）
+function getTotalItems(lesson) {
+    const paras = lesson.content.split(/(?<=[，。！？])/).map(s => s.trim()).filter(Boolean);
+    return lesson.words.length + paras.length;
+}
+
 // ════════════════════════════════════════
 //  初始化 — 从 Firestore 加载课程
 // ════════════════════════════════════════
@@ -257,6 +264,10 @@ window.onload = async () => {
     const savedSchool = localStorage.getItem('shizi_school');
     if (savedName)   document.getElementById('inputName').value   = savedName;
     if (savedSchool) document.getElementById('inputSchool').value = savedSchool;
+
+    // 姓名/学校填好后自动查询该生的学习进度
+    document.getElementById('inputName').addEventListener('blur', loadStudentProgress);
+    document.getElementById('inputSchool').addEventListener('blur', loadStudentProgress);
 
     try {
         const snap = await db.collection('lessons').get();
@@ -269,11 +280,49 @@ window.onload = async () => {
                 return parseLeadingCnNum(a.title) - parseLeadingCnNum(b.title);
             });
         renderLessonMenu();
+        if (savedName && savedSchool) loadStudentProgress();
     } catch(e) {
         document.getElementById('lessonMenu').innerHTML =
             '<div class="text-red-400 text-sm text-center py-6">课程加载失败，请检查网络</div>';
     }
 };
+
+// ════════════════════════════════════════
+//  学习进度 — 已完成 / 完成百分比
+// ════════════════════════════════════════
+async function loadStudentProgress() {
+    const s = document.getElementById('inputSchool').value.trim();
+    const n = document.getElementById('inputName').value.trim();
+    if (!s || !n || !allLessons.length) return;
+
+    try {
+        const snap = await db.collection('attempts')
+            .where('school', '==', s)
+            .where('studentName', '==', n)
+            .get();
+
+        studentProgress = {};
+        snap.docs.forEach(d => {
+            const a = d.data();
+            const lesson = allLessons.find(l => l.lessonId === a.lessonId);
+            if (!lesson) return;
+
+            const total = getTotalItems(lesson);
+            const requiredIds = [
+                ...lesson.words.map((_, i) => `word-${i}`),
+                ...Array.from({ length: total - lesson.words.length }, (_, i) => `para-${i}`)
+            ];
+            const done = requiredIds.filter(id => a.scores && a.scores[id] !== undefined).length;
+            const pct  = Math.round(done / total * 100);
+
+            const existing = studentProgress[a.lessonId];
+            if (!existing || a.completedAt || pct > existing.pct) {
+                studentProgress[a.lessonId] = { completed: !!a.completedAt, pct };
+            }
+        });
+        renderLessonMenu();
+    } catch(e) { /* 静默 */ }
+}
 
 function renderLessonMenu() {
     const menu = document.getElementById('lessonMenu');
@@ -291,12 +340,23 @@ function renderLessonMenu() {
             h.textContent = l.unit;
             menu.appendChild(h);
         }
+        const prog = studentProgress[l.lessonId];
+        let badge = '';
+        if (prog?.completed) {
+            badge = `<span class="text-[10px] font-black text-emerald-500 bg-emerald-50 px-2 py-1 rounded-full whitespace-nowrap">✅ 已完成</span>`;
+        } else if (prog && prog.pct > 0) {
+            badge = `<span class="text-[10px] font-black text-amber-500 bg-amber-50 px-2 py-1 rounded-full whitespace-nowrap">进度 ${prog.pct}%</span>`;
+        }
+
         const card = document.createElement('div');
         card.className = 'lesson-card bg-white border border-slate-100 rounded-2xl p-5 flex justify-between items-center cursor-pointer shadow-sm';
         card.innerHTML = `
             <div class="font-bold text-slate-700">${l.title}</div>
-            <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
-                <i class="fas fa-play text-[10px]"></i>
+            <div class="flex items-center gap-2">
+                ${badge}
+                <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                    <i class="fas fa-play text-[10px]"></i>
+                </div>
             </div>`;
         card.onclick = () => startLesson(i);
         menu.appendChild(card);
@@ -775,6 +835,7 @@ function goHome() {
     window.speechSynthesis.cancel();
     currentAttemptId = null;
     showScreen('screenStart');
+    loadStudentProgress();
 }
 
 // ════════════════════════════════════════
