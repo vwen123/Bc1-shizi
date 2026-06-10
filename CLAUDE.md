@@ -131,7 +131,7 @@ completedAt: timestamp | null
 - 🎤 朗读录音（`SpeechRecognition`，Web Speech API）
 
 **第二关：金声朗读**
-- 显示段落文字
+- 课文按「，。！？」分句，一句句读（`split(/(?<=[，。！？])/)`）
 - 范读 + 挑战朗读
 - 实时字符高亮（按顺序匹配，读对变绿）
 
@@ -146,6 +146,10 @@ score = (seqHits / totalChars * 0.6 + setHits / totalChars * 0.4) * 100
 - 停顿 1.8 秒自动结束
 - 再次点击按钮可手动停止
 - `onspeechstart` — 检测到声音即时反馈
+
+**第三关：趣味闯关**
+- 看图选词 / 听读选词
+- 看图选词大图：340px 高 + `object-contain`，完整显示不裁切
 
 ### 老师端（teacher.html）
 
