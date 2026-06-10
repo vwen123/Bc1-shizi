@@ -9,11 +9,11 @@
 | 项目 | 详情 |
 |------|------|
 | GitHub 仓库 | https://github.com/vwen123/Bc1-shizi |
-| 学生页面 | https://vven123.github.io/Bc1-shizi/index.html |
-| 老师控制台 | https://vven123.github.io/Bc1-shizi/teacher.html |
+| 学生页面 | https://vwen123.github.io/Bc1-shizi/index.html |
+| 老师控制台 | https://vwen123.github.io/Bc1-shizi/teacher.html |
 | 老师密码 | `8888`（可在 teacher.html 第一行 `TEACHER_PIN` 修改） |
 | Firebase 项目 | `huawen-class` |
-| GitHub 账号 | vven123 |
+| GitHub 账号 | vwen123 |
 
 ---
 
@@ -113,8 +113,8 @@ completedAt: timestamp | null
 | 第九单元·心爱的东西 | 一、睡衣 | 夜、黑色、换、森林 |
 | 第九单元·心爱的东西 | 二、铅笔 | 用、铅笔、文字、图画 |
 
-图片 URL 格式：`https://vven123.github.io/Bc1-shizi/images/{拼音}.png`
-例：`https://vven123.github.io/Bc1-shizi/images/shang-xue.png`
+图片 URL 格式：`https://vwen123.github.io/Bc1-shizi/images/{拼音}.png`
+例：`https://vwen123.github.io/Bc1-shizi/images/shang-xue.png`
 
 ---
 
@@ -168,7 +168,7 @@ score = (seqHits / totalChars * 0.6 + setHits / totalChars * 0.4) * 100
 
 ### 新增课文图片流程
 1. 告知词语，由 Claude 生成图片并推送 GitHub
-2. 图片网址格式：`https://vven123.github.io/Bc1-shizi/images/{拼音}.png`
+2. 图片网址格式：`https://vwen123.github.io/Bc1-shizi/images/{拼音}.png`
 3. 在老师端编辑课程，填入图片网址
 
 ### 图片文件命名规则
