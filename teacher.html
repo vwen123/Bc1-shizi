@@ -824,8 +824,8 @@ async function loadProgressBoard() {
         // 总访问次数（VISIT_OFFSET 为开始记录前的历史访问人数）
         let visitCount = '—';
         try {
-            const visitSnap = await db.collection('visits').count().get();
-            visitCount = VISIT_OFFSET + visitSnap.data().count;
+            const visitSnap = await db.collection('visits').get();
+            visitCount = VISIT_OFFSET + visitSnap.size;
         } catch(e) {}
 
         const lessons = allLessons.filter(l => l.status === 'published');
