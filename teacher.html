@@ -208,7 +208,7 @@ const db = firebase.firestore();
 
 const TEACHER_PIN = "8888"; // 修改此处更改密码
 const MY_SCHOOL   = "SJK(C) YANI"; // 本校标准名称，对应 index.html?school=yani
-const VISIT_OFFSET = 343; // 开始记录访问次数之前，已有的历史访问人数
+const VISIT_OFFSET = 440; // 开始记录访问次数之前，已有的历史访问人数
 let filterMySchool = false;
 
 // ── PIN 验证 ──────────────────────────────────────────────────
@@ -246,6 +246,17 @@ let allLessons = [];
 
 async function init() {
     await loadLessons();
+}
+
+// ── 中文数字解析（用于按单元/课题顺序排序）────────────────────
+const CN_NUM = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10};
+function parseLeadingCnNum(str) {
+    const m = (str || '').match(/[一二三四五六七八九十]/);
+    return m ? (CN_NUM[m[0]] || 999) : 999;
+}
+function parseUnitNum(unit) {
+    const m = (unit || '').match(/第([一二三四五六七八九十]+)单元/);
+    return m ? parseLeadingCnNum(m[1]) : 999;
 }
 
 // ── 一键初始化预设 6 课（直接写入 Firestore）─────────────────
@@ -319,8 +330,11 @@ async function loadLessons() {
                 const att  = attByLesson[d.id] || { total: 0, completed: 0 };
                 return { lessonId: d.id, ...data, attemptCount: att.total, completedCount: att.completed };
             })
-            .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))
-            .reverse();
+            .sort((a, b) => {
+                const ua = parseUnitNum(a.unit), ub = parseUnitNum(b.unit);
+                if (ua !== ub) return ua - ub;
+                return parseLeadingCnNum(a.title) - parseLeadingCnNum(b.title);
+            });
         renderLessons();
     } catch(e) {
         allLessons = [];
