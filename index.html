@@ -287,12 +287,6 @@ window.onload = async () => {
     document.getElementById('inputName').addEventListener('blur', loadStudentProgress);
     document.getElementById('inputSchool').addEventListener('blur', loadStudentProgress);
 
-    // 记录一次访问（统计有多少人按进这个系统）
-    db.collection('visits').add({
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        school: lockedSchool || null
-    }).catch(() => {});
-
     try {
         const snap = await db.collection('lessons').get();
         allLessons = snap.docs
@@ -397,6 +391,15 @@ function startLesson(idx) {
     if (!studentName) { showMsg('状元公，请先赐名哦！'); return; }
     localStorage.setItem('shizi_school',      school);
     localStorage.setItem('shizi_studentName', studentName);
+
+    // 记录一次访问（统计有多少人填名字按进系统），每次会话只记一次
+    if (!window._visitLogged) {
+        window._visitLogged = true;
+        db.collection('visits').add({
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            studentName, school
+        }).catch(() => {});
+    }
 
     currentLesson    = allLessons[idx];
     itemScores       = {};
