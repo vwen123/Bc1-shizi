@@ -71,6 +71,7 @@
             <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">学校名称</label>
             <input id="inputSchool" type="text" placeholder="例：YANI"
                    class="w-full px-6 py-4 border-2 border-slate-100 rounded-2xl text-center text-xl focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-50 transition-all bg-slate-50/50">
+            <p id="schoolLockHint" class="hidden text-xs text-emerald-500 font-bold mt-1 ml-2">🔒 已锁定本校学生</p>
         </div>
         <div class="text-left mb-6">
             <label class="text-sm font-bold text-slate-500 mb-2 block ml-2">输入你的名字</label>
@@ -196,6 +197,10 @@
             <div class="text-sm font-bold text-blue-600 uppercase mb-1">状元总得分</div>
             <div id="rewardScore" class="text-5xl font-black text-blue-600">0</div>
         </div>
+        <div id="leaderboardBox" class="hidden text-left mb-8">
+            <div class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">🏅 本课排行榜 TOP 10</div>
+            <div id="leaderboardList" class="space-y-1.5 max-h-56 overflow-y-auto pr-1"></div>
+        </div>
         <button onclick="goHome()" class="w-full bg-slate-800 hover:bg-black text-white py-5 rounded-2xl font-black text-lg shadow-xl">
             返回首页
         </button>
@@ -218,6 +223,9 @@ const db = firebase.firestore();
 
 // 填入 Google Apps Script Web App URL（部署后从 GAS 复制）
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwVY3EK9SqaaPKtpp9UJjRR859Fvs7oZLP4bxwh4IxFT_F6Z777e1FenY1LFduB5q1P/exec';
+
+// 本校专属链接：index.html?school=yani 会自动锁定学校字段
+const SCHOOL_PARAM_MAP = { yani: 'SJK(C) YANI' };
 
 // ════════════════════════════════════════
 //  应用状态
@@ -264,6 +272,16 @@ window.onload = async () => {
     const savedSchool = localStorage.getItem('shizi_school');
     if (savedName)   document.getElementById('inputName').value   = savedName;
     if (savedSchool) document.getElementById('inputSchool').value = savedSchool;
+
+    // 本校专属链接：?school=yani → 锁定学校字段
+    const lockedSchool = SCHOOL_PARAM_MAP[new URLSearchParams(location.search).get('school')];
+    if (lockedSchool) {
+        const schoolInput = document.getElementById('inputSchool');
+        schoolInput.value = lockedSchool;
+        schoolInput.readOnly = true;
+        schoolInput.classList.add('bg-slate-100', 'text-slate-400');
+        document.getElementById('schoolLockHint').classList.remove('hidden');
+    }
 
     // 姓名/学校填好后自动查询该生的学习进度
     document.getElementById('inputName').addEventListener('blur', loadStudentProgress);
@@ -753,8 +771,52 @@ function checkAllDone() {
             document.getElementById('rewardScore').textContent = total;
             showScreen('screenReward');
             launchConfetti();
+            loadLeaderboard(currentLesson.lessonId);
         }, 1000);
     }
+}
+
+// ════════════════════════════════════════
+//  本课排行榜 TOP 10
+// ════════════════════════════════════════
+async function loadLeaderboard(lessonId) {
+    const box  = document.getElementById('leaderboardBox');
+    const list = document.getElementById('leaderboardList');
+    try {
+        const snap = await db.collection('attempts').where('lessonId', '==', lessonId).get();
+
+        // 同一学生可能多次练习，取最高分
+        const best = {};
+        snap.docs.forEach(d => {
+            const a = d.data();
+            if (!a.completedAt) return;
+            const key = `${a.school || ''}__${a.studentName}`;
+            if (!best[key] || (a.totalScore || 0) > (best[key].totalScore || 0)) best[key] = a;
+        });
+
+        const ranked = Object.values(best)
+            .sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0))
+            .slice(0, 10);
+
+        if (!ranked.length) { box.classList.add('hidden'); return; }
+
+        const medals = ['🥇', '🥈', '🥉'];
+        list.innerHTML = ranked.map((a, i) => {
+            const isMe = a.studentName === studentName && a.school === school;
+            return `
+            <div class="flex items-center justify-between px-3 py-2 rounded-xl ${isMe ? 'bg-blue-50 border-2 border-blue-200' : 'bg-slate-50'}">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-6 text-center shrink-0 ${i < 3 ? 'text-lg' : 'text-xs font-black text-slate-400'}">${medals[i] || (i + 1)}</span>
+                    <div class="min-w-0">
+                        <div class="font-bold text-slate-700 text-sm truncate">${a.studentName}${isMe ? '（我）' : ''}</div>
+                        <div class="text-[10px] text-slate-400 truncate">${a.school || '—'}</div>
+                    </div>
+                </div>
+                <div class="font-black text-blue-600 shrink-0 ml-2">${a.totalScore ?? 0}</div>
+            </div>`;
+        }).join('');
+        box.classList.remove('hidden');
+    } catch(e) { box.classList.add('hidden'); }
 }
 
 // ════════════════════════════════════════
