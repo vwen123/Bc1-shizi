@@ -542,6 +542,18 @@ async function confirmDeleteAttempt(attemptId, studentName) {
     } catch(e) { toast('删除失败：' + e.message, true); }
 }
 
+async function confirmDeleteStudent(studentName, attemptIds) {
+    if (!attemptIds.length) return;
+    if (!confirm(`确定删除「${studentName}」的全部练习记录（共 ${attemptIds.length} 条）？\n此操作不可撤销。`)) return;
+    try {
+        const batch = db.batch();
+        attemptIds.forEach(id => batch.delete(db.collection('attempts').doc(id)));
+        await batch.commit();
+        toast('已删除');
+        await loadProgressBoard();
+    } catch(e) { toast('删除失败：' + e.message, true); }
+}
+
 function copyLink(lessonId) {
     const url = location.origin + location.pathname.replace('teacher.html', 'index.html');
     navigator.clipboard.writeText(url).then(() => toast('学生链接已复制！'));
@@ -791,8 +803,15 @@ async function loadProgressBoard() {
     board.innerHTML = '<div class="text-center text-slate-400 py-10">加载中...</div>';
     try {
         const attSnap = await db.collection('attempts').get();
-        let attempts = attSnap.docs.map(d => d.data());
+        let attempts = attSnap.docs.map(d => ({ attemptId: d.id, ...d.data() }));
         if (filterMySchool) attempts = attempts.filter(a => a.school === MY_SCHOOL);
+
+        // 总访问次数
+        let visitCount = '—';
+        try {
+            const visitSnap = await db.collection('visits').count().get();
+            visitCount = visitSnap.data().count;
+        } catch(e) {}
 
         const lessons = allLessons.filter(l => l.status === 'published');
         if (!lessons.length) {
@@ -803,6 +822,7 @@ async function loadProgressBoard() {
         // 每位学生每课的最佳状态
         const statusMap = {};   // studentName → lessonId → 'done'|'partial'
         const schoolMap = {};   // studentName → school
+        const attemptIdsMap = {}; // studentName → [attemptId, ...]
         for (const a of attempts) {
             const s = a.studentName; const l = a.lessonId;
             if (!s || !l) continue;
@@ -810,6 +830,7 @@ async function loadProgressBoard() {
             if (a.school && !schoolMap[s]) schoolMap[s] = a.school;
             if (a.completedAt) statusMap[s][l] = 'done';
             else if (!statusMap[s][l]) statusMap[s][l] = 'partial';
+            (attemptIdsMap[s] = attemptIdsMap[s] || []).push(a.attemptId);
         }
 
         const students = Object.keys(statusMap).sort();
@@ -818,7 +839,8 @@ async function loadProgressBoard() {
                 ? 'bg-emerald-500 text-white border-emerald-500'
                 : 'border-slate-200 text-slate-400 hover:border-emerald-300';
             board.innerHTML = `
-            <div class="flex justify-end mb-3">
+            <div class="flex justify-between items-center mb-3">
+                <div class="text-xs font-bold text-slate-400">👀 总访问次数：${visitCount}</div>
                 <button onclick="toggleSchoolFilter()"
                     class="school-filter-btn text-xs px-4 py-2.5 rounded-xl font-bold border-2 transition-all whitespace-nowrap ${filterBtnClassEmpty}">
                     ✅ 只看本校学生
@@ -838,7 +860,8 @@ async function loadProgressBoard() {
             ? 'bg-emerald-500 text-white border-emerald-500'
             : 'border-slate-200 text-slate-400 hover:border-emerald-300';
         board.innerHTML = `
-        <div class="flex justify-end mb-3">
+        <div class="flex justify-between items-center mb-3">
+            <div class="text-xs font-bold text-slate-400">👀 总访问次数：${visitCount}</div>
             <button onclick="toggleSchoolFilter()"
                 class="school-filter-btn text-xs px-4 py-2.5 rounded-xl font-bold border-2 transition-all whitespace-nowrap ${filterBtnClass}">
                 ✅ 只看本校学生
@@ -856,6 +879,7 @@ async function loadProgressBoard() {
                             <div>${l.title}</div>
                             <div class="text-[10px] text-green-500 font-black mt-0.5">${doneCount[l.lessonId]}/${students.length} 完成</div>
                         </th>`).join('')}
+                        <th class="px-4 py-3 font-bold text-slate-500 border-b border-slate-100 text-center text-xs min-w-[60px]">操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -871,6 +895,12 @@ async function loadProgressBoard() {
                                 st === 'done' ? '✅' : st === 'partial' ? '🔄' : '⬜'
                             }</td>`;
                         }).join('')}
+                        <td class="px-4 py-3 text-center border-b border-slate-50">
+                            <button onclick='confirmDeleteStudent(${JSON.stringify(student)}, ${JSON.stringify(attemptIdsMap[student] || [])})'
+                                class="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-400 transition-all inline-flex items-center justify-center text-xs">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
                     </tr>`).join('')}
                 </tbody>
             </table>
