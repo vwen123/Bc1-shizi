@@ -238,3 +238,12 @@ git push
 - **OpenAI key** 未推到 GitHub（只用于本地生成图片）
 - Firebase API key 可公开（已通过 Firestore 安全规则保护）
 - 老师密码存于 `localStorage`，清除浏览器数据会需要重新输入
+
+---
+
+## 🪲 踩坑记录
+
+### 2026-06-13
+- **问题**：`db.collection('visits').count().get()`（Firestore JS compat SDK 11.0.0 聚合查询）在浏览器端静默失败，导致教师端「总访问次数」一直显示「—」。
+- **解法**：改用 `db.collection('visits').get()` 取 `.size`（visits 数据量小，直接拉全部文档即可，避免聚合查询 API 兼容性问题）。
+- **附带修复**：课程列表/进度看板/学生数据原本按 `createdAt` 倒序排，新增的第九单元会跑到最前面，容易被误以为「没显示」；改为按「单元号+课题号」中文数字顺序排序（第一→九单元）。`VISIT_OFFSET` 同步从 343 更新为 440。
