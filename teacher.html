@@ -836,19 +836,31 @@ async function loadProgressBoard() {
 
         // 每位学生每课的最佳状态
         const statusMap = {};   // studentName → lessonId → 'done'|'partial'
+        const bestScoreMap = {}; // studentName → lessonId → 最高分
         const schoolMap = {};   // studentName → school
         const attemptIdsMap = {}; // studentName → [attemptId, ...]
         for (const a of attempts) {
             const s = a.studentName; const l = a.lessonId;
             if (!s || !l) continue;
             if (!statusMap[s]) statusMap[s] = {};
+            if (!bestScoreMap[s]) bestScoreMap[s] = {};
             if (a.school && !schoolMap[s]) schoolMap[s] = a.school;
             if (a.completedAt) statusMap[s][l] = 'done';
             else if (!statusMap[s][l]) statusMap[s][l] = 'partial';
+            if (a.completedAt) {
+                const score = a.totalScore || 0;
+                if (!bestScoreMap[s][l] || score > bestScoreMap[s][l]) bestScoreMap[s][l] = score;
+            }
             (attemptIdsMap[s] = attemptIdsMap[s] || []).push(a.attemptId);
         }
 
-        const students = Object.keys(statusMap).sort();
+        // 总分 = 各课最高分之和
+        const totalScoreMap = {}; // studentName → 总分
+        Object.keys(statusMap).forEach(s => {
+            totalScoreMap[s] = Object.values(bestScoreMap[s] || {}).reduce((sum, v) => sum + v, 0);
+        });
+
+        const students = Object.keys(statusMap).sort((a, b) => (totalScoreMap[b] || 0) - (totalScoreMap[a] || 0));
         if (!students.length) {
             const filterBtnClassEmpty = filterMySchool
                 ? 'bg-emerald-500 text-white border-emerald-500'
@@ -894,6 +906,7 @@ async function loadProgressBoard() {
                             <div>${l.title}</div>
                             <div class="text-[10px] text-green-500 font-black mt-0.5">${doneCount[l.lessonId]}/${students.length} 完成</div>
                         </th>`).join('')}
+                        <th class="px-4 py-3 font-bold text-slate-500 border-b border-slate-100 text-center text-xs min-w-[70px]">🏆 总分</th>
                         <th class="px-4 py-3 font-bold text-slate-500 border-b border-slate-100 text-center text-xs min-w-[60px]">操作</th>
                     </tr>
                 </thead>
@@ -910,6 +923,7 @@ async function loadProgressBoard() {
                                 st === 'done' ? '✅' : st === 'partial' ? '🔄' : '⬜'
                             }</td>`;
                         }).join('')}
+                        <td class="px-4 py-3 text-center border-b border-slate-50 font-black text-blue-600">${totalScoreMap[student] || 0}</td>
                         <td class="px-4 py-3 text-center border-b border-slate-50">
                             <button onclick='confirmDeleteStudent(${JSON.stringify(student)}, ${JSON.stringify(attemptIdsMap[student] || [])})'
                                 class="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-400 transition-all inline-flex items-center justify-center text-xs">
