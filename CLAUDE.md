@@ -66,7 +66,11 @@ service cloud.firestore {
     }
     match /attempts/{attemptId} {
       allow read: if true;
-      allow create, update: if true;
+      allow create, update, delete: if true;
+    }
+    match /visits/{visitId} {
+      allow read: if true;
+      allow create: if true;
     }
   }
 }
@@ -95,6 +99,14 @@ totalScore:  number
 startedAt:   timestamp
 completedAt: timestamp | null
 ```
+
+**`/visits/{auto-id}`**（学生填名字+点击开始上课时记一次，每次会话只记一次）
+```
+studentName: string
+school:      string
+timestamp:   timestamp
+```
+老师端「总访问次数」= `VISIT_OFFSET (343，开始统计前的历史访客数)` + `/visits` 集合文档数
 
 ---
 
@@ -161,6 +173,7 @@ score = (seqHits / totalChars * 0.6 + setHits / totalChars * 0.4) * 100
 - 词语支持填入图片网址（GitHub Pages URL）
 - 一键初始化 6 课预设课程
 - 学生数据分析：人数、得分、柱状图
+- 进度看板：显示「👀 总访问次数」（含历史基数 VISIT_OFFSET）；每位学生一行，可点 🗑️ 一键删除该生全部练习记录（用于清理访客测试数据）
 
 ---
 
