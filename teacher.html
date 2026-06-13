@@ -208,6 +208,7 @@ const db = firebase.firestore();
 
 const TEACHER_PIN = "8888"; // 修改此处更改密码
 const MY_SCHOOL   = "SJK(C) YANI"; // 本校标准名称，对应 index.html?school=yani
+const VISIT_OFFSET = 343; // 开始记录访问次数之前，已有的历史访问人数
 let filterMySchool = false;
 
 // ── PIN 验证 ──────────────────────────────────────────────────
@@ -806,11 +807,11 @@ async function loadProgressBoard() {
         let attempts = attSnap.docs.map(d => ({ attemptId: d.id, ...d.data() }));
         if (filterMySchool) attempts = attempts.filter(a => a.school === MY_SCHOOL);
 
-        // 总访问次数
+        // 总访问次数（VISIT_OFFSET 为开始记录前的历史访问人数）
         let visitCount = '—';
         try {
             const visitSnap = await db.collection('visits').count().get();
-            visitCount = visitSnap.data().count;
+            visitCount = VISIT_OFFSET + visitSnap.data().count;
         } catch(e) {}
 
         const lessons = allLessons.filter(l => l.status === 'published');
